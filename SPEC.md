@@ -1,6 +1,7 @@
 # duo.py contract
 
-Version 1, 2026-10-05 (milestone 1). `duo.py` implements it; the tests in `tests/` enforce sections 2 to 6.
+Version 2, 2026-10-05 (file helper and peer wake commands). `duo.py` implements it; the tests in
+`tests/` enforce sections 2 to 6.
 
 ## 1. Scope
 
@@ -9,7 +10,7 @@ Version 1, 2026-10-05 (milestone 1). `duo.py` implements it; the tests in `tests
   Linux stays a declared target until the suite has run there.
 - Exactly two participants per dialogue file, and one active session per participant. The crossing guard
   cannot tell two sessions with the same name apart.
-- Milestone 1 is the file helper and the prompt. Session wake-up and any controller are later milestones.
+- Includes the file helper, prompt and optional peer wake commands. No persistent watcher or controller.
 
 ## 2. Dialogue format
 
@@ -73,7 +74,8 @@ All commands take `--file PATH`, optional `--settings PATH`, and `--json` for on
 | `tail --turns K` | Read-only; the last K turns with text. |
 | `next --as NAME` | Deliver every unresolved completed peer turn, in file order, and record a receipt for each. |
 | `wait --as NAME --timeout SEC [--interval SEC]` | Read-only; return when an unresolved completed peer turn exists that NAME has no receipt for. Redeliveries do not end a wait. An incomplete or malformed tail seen while waiting (a write in progress) does not end it either; check again at the next interval. |
-| `append --as NAME --subject TEXT --body FILE [--reply-to KEY ...]` | Append one complete turn. `--reply-to` repeats; `--reply-to all` names every unresolved peer turn the writer has received. |
+| `append --as NAME --subject TEXT --body FILE [--reply-to KEY ...] [--no-wake]` | Append one complete turn, then wake the peer (section 4, Wake). `--reply-to` repeats; `--reply-to all` names every unresolved peer turn the writer has received. |
+| `wake --as NAME --exec COMMAND` or `wake --as NAME --clear` | Register or remove NAME's wake command. Returns the resulting `wake` mapping. |
 
 There is no `amend`. Published turns are final; a correction is a new turn that names the turn it corrects.
 
@@ -83,7 +85,8 @@ There is no `amend`. Published turns are final; a correction is a new turn that 
 
 **`status` object**: `turns`, `max_number`, `last`, `last_complete`, `incomplete_tail`,
 `pending` (participant name to the keys of turns unresolved for them, in file order), `receipts`
-(list of `by`, `key`, `time`). `last` and `last_complete` are `null` when there is no such turn.
+(list of `by`, `key`, `time`), `wake` (participant name to registered command). `last` and `last_complete`
+are `null` when there is no such turn.
 
 ## 4. Writes
 
@@ -107,6 +110,38 @@ There is no `amend`. Published turns are final; a correction is a new turn that 
   work pending and the next `next` redelivers it. An unreadable state file is exit 1, never a silent reset.
 - `next` returns every unresolved turn again until a reply names it, with `redelivered: true` once received.
   Redelivery means "finish or reconcile this", not "repeat what you already did".
+
+**Wake** (the tests in `tests/test_wake.py` and `tests/test_wake_failures.py` enforce it):
+- A participant may register one wake command, stored in the state file. Only configured names are
+  accepted, and registering never changes the dialogue or receipts. Registration and clearing use the
+  same lock and atomic state replacement as receipts. A missing registration clears successfully.
+  Commands must be nonempty UTF-8 strings without NUL characters. Malformed registrations in stored
+  state are exit 1 before any append. Old state without `wake` means no registrations.
+- After a successful `append`, and after releasing the lock, the writer runs the peer's command once with
+  `/bin/sh -c` and these environment variables: `DUO_FILE` (absolute path), `DUO_FROM` (the writer) and
+  `DUO_TURN` (the new number). The working directory is the dialogue's directory. Other environment
+  variables come from the writer. The command is captured under the append lock; a concurrent clear
+  cannot cancel an already selected command. The writer never runs its own command; `--no-wake` skips it.
+- The command has no stdin; its stdout and stderr are discarded so append output remains one JSON
+  object. Commands can redirect their own diagnostics to a file. It has a 30-second timeout; timeout
+  kills the shell's process group and reports exit 124. A launch failure reports exit 127; otherwise
+  `exit` is the subprocess return code (negative for a signal).
+- The result goes into append output as `wake: {"exit": N}`, or `null` when absent or skipped. A nonzero
+  exit or timeout prints a warning naming `wake` on stderr. `append` still exits 0, because the turn is
+  written and the peer's `next` or `wait` still finds it. An interrupt or failure reporting the result is
+  exit 5: inspect the committed turn; never repeat an append to retry a notification.
+- This is one notification attempt per successful append, not guaranteed delivery. A crash between
+  append and dispatch can miss it, and a timed-out command may already have notified the peer. Receipt
+  and reply tracking remain the source of truth. No notification retries, cursor or background process.
+- The command runs with the writer's permissions; register only commands both sides trust.
+- Example for Codex, registered once at the start (the variable expands at registration):
+  `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'New turn in DIALOGUE.md: run duo.py next.'"`.
+  Require a nonempty ID before registering. A local Codex CLI 0.154.0 desktop test recorded a new turn
+  about 1.3 seconds after the reported idle queue time (queue time had one-second precision). This is
+  one observation, not a latency guarantee. The writer needs `codex` on PATH and permission to access
+  Codex's local state; a filesystem sandbox can prevent dispatch. Closed-app delivery is untested.
+- A Claude Code participant can register nothing and keep a background `wait`, which makes no model
+  calls while it sleeps. Clear your registration when leaving the paired session.
 
 ## 5. Read-only commands
 

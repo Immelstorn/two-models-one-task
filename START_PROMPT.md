@@ -17,6 +17,12 @@ is your name and PEER is the other participant.
 1. If `DIALOGUE.md` does not exist, run `python3 duo.py init --file DIALOGUE.md --names FIRST,SECOND`
    with the two names from the Participants line, in that order. If it fails because the file now
    exists, just continue.
+   Clear any previous wake command for your name: `python3 duo.py wake --file DIALOGUE.md --as ME --clear`.
+   On Codex, if your tool environment has a nonempty `CODEX_THREAD_ID` and the peer can run `codex queue`
+   with access to Codex's local state, register:
+   `python3 duo.py wake --file DIALOGUE.md --as ME --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'New peer turn in DIALOGUE.md: run duo.py next as your participant and continue.'"`.
+   Expand the ID now, so the peer targets your session when posting. The command runs with the peer's
+   permissions; both sides must trust it. Claude Code can use background wait without a registration.
 2. If the owner gave you the task, you implement: post the task brief as the first turn (step 5),
    quoting the owner's words exactly. If the owner gave you no task, you review: wait for the brief.
    If PEER posts a brief before you (exit 3 in step 5), you review. The owner can assign roles differently.
@@ -33,7 +39,13 @@ is your name and PEER is the other participant.
    - Exit 4: the file has a broken or unfinished turn. Tell the owner and do not write.
    - Exit 5: interrupted, and something may be written. Run `python3 duo.py status --file DIALOGUE.md`,
      compare, then continue.
-6. Wait only when your next step needs PEER: `python3 duo.py wait --file DIALOGUE.md --as ME --timeout 3600`.
+   - A wake warning means your turn was posted but notification failed or is uncertain. Do not append
+     the turn again. Tell the owner if the peer has no working wait or wake route.
+   - Use `--no-wake` for notes that require no peer action.
+6. Wait only when your next step needs PEER. If your wake command is registered and the peer can run it,
+   finish your current turn; the peer's next post queues your continuation. No polling or scheduled
+   checks are needed. On continuation, go to step 3.
+   Otherwise: `python3 duo.py wait --file DIALOGUE.md --as ME --timeout 3600`.
    If your host can run it in the background and resume you when it ends (Claude Code can), do that.
    Otherwise run it in the foreground with a timeout your host allows (for example `--timeout 50`) and
    repeat, checking for owner messages between runs; each timeout returns to you and costs a model step.
@@ -57,3 +69,6 @@ is your name and PEER is the other participant.
 - the work is done and the reviewer has accepted it (a final acceptance needs no reply);
 - a decision belongs to the owner (say so in a turn, then wait for the owner);
 - you reach a limit the owner set (time, turns or money).
+
+Before stopping, clear your wake command with `python3 duo.py wake --file DIALOGUE.md --as ME --clear`.
+Register again only when the owner resumes the paired work. No persistent watcher needs stopping.

@@ -3,7 +3,7 @@
 
 Copy this file and START_PROMPT.md. Runtime files are DIALOGUE.lock and
 DIALOGUE.state.json. All writers must use this helper, with one session per
-participant. This is a file helper; it does not launch or wake model sessions.
+participant. Optional registered commands notify the peer after a successful post.
 """
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ import math
 import os
 from pathlib import Path
 import re
+import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -26,6 +28,7 @@ SETTINGS_PREFIX = '<!-- duo settings: '
 REPLIES_PREFIX = '<!-- duo replies:'
 SEPARATORS = (' - ', ' \u2014 ')
 KEY = re.compile(r'[0-9a-f]{64}(?:-[2-9][0-9]*|-1[0-9]+)?\Z')
+WAKE_TIMEOUT = 30
 
 
 class DuoError(Exception):
@@ -215,6 +218,11 @@ def validate_state(state, data, turns, settings):
             raise DuoError('dialogue history changed under receipt state; explicit migration is required')
     by_key = {t['key']: t for t in turns if t['complete']}
     names = {p['name'] for p in settings['participants']}
+    wake = state.get('wake', {})
+    if not isinstance(wake, dict) or any(name not in names for name in wake):
+        raise DuoError('invalid wake registrations in state')
+    for command in wake.values():
+        validate_wake_command(command)
     seen = set()
     for receipt in state['receipts']:
         if not isinstance(receipt, dict) or set(receipt) != {'by', 'key', 'time'}:
@@ -347,6 +355,69 @@ def deliver(args, path):
         return {'turns': result}, 0
 
 
+def validate_wake_command(command):
+    if not isinstance(command, str) or not command.strip() or '\x00' in command:
+        raise DuoError('wake command must be nonempty text without NUL characters')
+    try:
+        command.encode('utf-8')
+    except UnicodeError as exc:
+        raise DuoError('wake command must be valid UTF-8 text') from exc
+
+
+def register_wake(args, path):
+    with locked(path):
+        data, settings, turns, state, received, pending = snapshot(path, args.settings)
+        require_person(args.person, settings)
+        wake = state.setdefault('wake', {})
+        if args.clear:
+            wake.pop(args.person, None)
+        else:
+            validate_wake_command(args.wake_exec)
+            wake[args.person] = args.wake_exec
+        state['prefix'] = {'bytes': len(data), 'sha256': digest(data)}
+        try:
+            save_state(path, state)
+        except OSError as exc:
+            raise DuoError(f'wake registration interrupted: {exc}; inspect status before retrying', 5) from exc
+    return {'wake': wake}, 0
+
+
+def run_wake(command, path, author, number):
+    if command is None:
+        return None
+    env = dict(os.environ, DUO_FILE=str(path), DUO_FROM=author, DUO_TURN=str(number))
+    process = None
+    warning = None
+    try:
+        # No inherited stdin or output: commands cannot consume a turn body or
+        # corrupt the helper's JSON. Commands must do their own logging if needed.
+        process = subprocess.Popen(['/bin/sh', '-c', command], env=env, cwd=str(path.parent),
+                                   stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, start_new_session=True)
+        code = process.wait(timeout=WAKE_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        code = 124
+        warning = f'timed out after {WAKE_TIMEOUT} seconds'
+    except OSError as exc:
+        code = 127
+        warning = f'could not start or wait for command: {exc}'
+    except KeyboardInterrupt as exc:
+        raise DuoError('wake interrupted after append; turn is committed, inspect status before retrying', 5) from exc
+    finally:
+        if process is not None and process.returncode is None:
+            # Kill the shell and its descendants, not just the shell that may
+            # have been waiting for the actual notification command.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
+    if code:
+        warning = warning or f'exited {code}'
+        print(f'duo: wake {warning}; turn is committed, do not append it again', file=sys.stderr)
+    return {'exit': code}
+
+
 def body_text(args, settings):
     subject = single_line(args.subject, 'subject')
     text = Path(args.body).read_text(encoding='utf-8')
@@ -410,7 +481,15 @@ def append_turn(args, path):
                 os.fsync(handle.fileno())
         except OSError as exc:
             raise DuoError(f'append interrupted: {exc}; inspect the tail before retrying', 5) from exc
-        return {'turn': public_turn(proposed[-1])}, 0
+        peer = next(p['name'] for p in settings['participants'] if p['name'] != args.person)
+        command = None if args.no_wake else state.get('wake', {}).get(peer)
+        turn = public_turn(proposed[-1])
+    # A receiver can immediately call next, which needs the same lock.
+    try:
+        wake = run_wake(command, path, args.person, number)
+    except OSError as exc:
+        raise DuoError(f'wake reporting interrupted: {exc}; turn is committed, inspect status', 5) from exc
+    return {'turn': turn, 'wake': wake}, 0
 
 
 def read_command(args, path):
@@ -439,7 +518,7 @@ def read_command(args, path):
                     'last_complete': public_turn(complete[-1]) if complete else None,
                     'incomplete_tail': bool(turns and not turns[-1]['complete']),
                     'pending': {name: [t['key'] for t in values] for name, values in pending.items()},
-                    'receipts': state['receipts']}, 0
+                    'receipts': state['receipts'], 'wake': state.get('wake', {})}, 0
         if args.command == 'tail':
             selected = turns[-args.turns:] if args.turns else []
             return {'turns': [public_turn(t, True) for t in selected]}, 0
@@ -456,7 +535,7 @@ def read_command(args, path):
 def arguments(argv):
     parser = Parser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True, parser_class=Parser)
-    for name in ('init', 'append', 'next', 'wait', 'tail', 'status'):
+    for name in ('init', 'append', 'next', 'wait', 'tail', 'status', 'wake'):
         command = commands.add_parser(name)
         command.add_argument('--file', required=True)
         command.add_argument('--settings')
@@ -464,12 +543,17 @@ def arguments(argv):
         if name == 'init':
             command.add_argument('--names', required=True)
             command.add_argument('--markers')
-        if name in ('append', 'next', 'wait'):
+        if name in ('append', 'next', 'wait', 'wake'):
             command.add_argument('--as', dest='person', required=True)
         if name == 'append':
             command.add_argument('--subject', required=True)
             command.add_argument('--body', required=True)
             command.add_argument('--reply-to', action='append')
+            command.add_argument('--no-wake', action='store_true')
+        if name == 'wake':
+            action = command.add_mutually_exclusive_group(required=True)
+            action.add_argument('--exec', dest='wake_exec')
+            action.add_argument('--clear', action='store_true')
         if name == 'tail':
             command.add_argument('--turns', type=int, default=5)
         if name == 'wait':
@@ -494,6 +578,8 @@ def main(argv=None):
             result, code = deliver(args, path)
         elif args.command == 'append':
             result, code = append_turn(args, path)
+        elif args.command == 'wake':
+            result, code = register_wake(args, path)
         else:
             result, code = read_command(args, path)
         if args.json:
