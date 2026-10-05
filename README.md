@@ -16,12 +16,13 @@ session has ended is not part of it (see "Limits").
 
 ## How to use it
 
-1. Copy `duo.py` into your project.
-2. Fill the `{placeholders}` in `START_PROMPT.md` twice, once per agent: names, roles, task, dialogue
-   path, your rules file, a session budget and a wait recipe for that agent's host.
-3. Start two sessions and paste one filled prompt into each. The first agent creates the dialogue with
-   `python3 duo.py init --file DIALOGUE.md --names Ada,Bo`.
-4. Watch the dialogue file. Step in when an agent says a decision is yours.
+1. Copy `duo.py` into your project root.
+2. Open two sessions in the project root, for example Claude Code and Codex, and paste the whole of
+   `START_PROMPT.md` into each, unchanged. Pairing other models? Edit its first line (`Participants:`) once.
+3. Give the task to one of them. That one implements; the other reviews.
+4. Watch `DIALOGUE.md`. Step in when an agent says a decision is yours.
+
+Add `DIALOGUE.md.lock` and `DIALOGUE.md.state.json` to your `.gitignore`; they are runtime files.
 
 The core commands, all with `--file DIALOGUE.md`:
 
