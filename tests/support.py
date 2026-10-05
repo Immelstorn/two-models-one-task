@@ -112,6 +112,30 @@ Starting.
 {_SAME}
 {_SAME}"""
 
+# Hand-written legacy headers that put words around "Turn N".
+ADDENDUM_HEADERS = f"""# Dialogue
+
+## Ada - 2026-09-18 10:00 UTC - Turn 1 - question
+
+Question.
+
+{ADA_MARK}
+
+
+## Bo - 2026-09-18 10:05 UTC - Addendum to Turn 1 - one more point
+
+Point.
+
+{BO_MARK}
+
+
+## Ada - 2026-09-18 10:09 UTC - Turn 2 (addendum) - follow-up
+
+More.
+
+{ADA_MARK}
+"""
+
 # The tail turn quotes its marker mid-body but does not end with it.
 INCOMPLETE_TAIL = f"""# Dialogue
 
@@ -158,9 +182,9 @@ class DuoCase(unittest.TestCase):
     def settings(self, data: dict, name: str = "dialogue.settings.json") -> Path:
         return self.write(name, json.dumps(data))
 
-    def legacy(self, text: str, settings: dict) -> tuple[Path, list[str]]:
+    def legacy(self, text: str, settings: dict, name: str = "legacy.md") -> tuple[Path, list[str]]:
         """A legacy dialogue file plus the common arguments to address it."""
-        path = self.write("legacy.md", text)
+        path = self.write(name, text)
         return path, ["--file", str(path), "--settings", str(self.settings(settings))]
 
     def new_dialogue(self) -> tuple[Path, list[str]]:

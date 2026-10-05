@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import unittest
 
-from support import (BANNER_LEGACY, BANNER_SETTINGS, INCOMPLETE_TAIL, MARKDOWN_LEGACY,
+from support import (ADDENDUM_HEADERS, BANNER_LEGACY, BANNER_SETTINGS, INCOMPLETE_TAIL, MARKDOWN_LEGACY,
                      MARKDOWN_SETTINGS, DuoCase, listing, sha)
 
 
@@ -57,6 +57,25 @@ class MarkdownLegacy(DuoCase):
 
         self.assertTrue(all(t["key"] == t["sha256"] and len(t["sha256"]) == 64 for t in turns))
         self.assertTrue(all(t["replies"] is None for t in turns))
+
+
+class LegacyHeaderVariants(DuoCase):
+    def test_words_around_the_turn_number_still_make_a_header(self):
+        _, common = self.legacy(ADDENDUM_HEADERS, MARKDOWN_SETTINGS)
+
+        turns = self.duo_json("tail", *common, "--turns", "10")["turns"]
+
+        self.assertEqual([(t["author"], t["number"], t["complete"]) for t in turns],
+                         [("Ada", 1, True), ("Bo", 1, True), ("Ada", 2, True)])
+
+    def test_a_header_without_a_turn_number_is_reported(self):
+        text = ADDENDUM_HEADERS.replace("Addendum to Turn 1 - one more point", "one more point")
+        _, common = self.legacy(text, MARKDOWN_SETTINGS)
+
+        done = self.duo("status", *common, "--json")
+
+        self.assertEqual(done.returncode, 4)
+        self.assertIn("line 10", done.stderr)
 
 
 class BannerLegacy(DuoCase):

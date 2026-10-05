@@ -59,9 +59,9 @@ class Append(DuoCase):
                  ("long dash", LONG_DASH_ONLY, MARKDOWN_SETTINGS, "Bo",
                   rf"^## Bo {DASH} .* {DASH} Turn 2 {DASH} reply$"),
                  ("banner", BANNER_LEGACY, BANNER_SETTINGS, "ADA", r"^=== TURN 3 \| ADA \| .* ===$")]
-        for style, text, settings, who, header in cases:
+        for index, (style, text, settings, who, header) in enumerate(cases):
             with self.subTest(style=style):
-                path, common = self.legacy(text, settings)
+                path, common = self.legacy(text, settings, f"legacy-{index}.md")
                 prefix = path.read_bytes()
 
                 self.duo("next", *common, "--as", who, expect=0)
@@ -77,9 +77,8 @@ class Append(DuoCase):
         self.duo("next", *common, "--as", "Bo", expect=0)
         before = sha(path)
 
-        done = self.post(common, "Bo", "reply", "Done.\n")
+        done = self.post(common, "Bo", "reply", "Done.\n", expect=1)
 
-        self.assertEqual(done.returncode, 1)
         self.assertIn("write_separator", done.stderr)
         self.assertEqual(sha(path), before)
 

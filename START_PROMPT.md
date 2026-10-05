@@ -1,6 +1,6 @@
 # Starting prompt for two models on one task
 
-Draft v2.1, 2026-10-05. The owner fills the `{placeholders}` once per model and pastes the text
+Draft v2.2, 2026-10-05. The owner fills the `{placeholders}` once per model and pastes the text
 below the line into that model's session. Copy `duo.py` next to it into the project.
 
 ---
@@ -31,7 +31,10 @@ Run one session as {ME} at a time.
      `--reply-to KEY` instead. A progress note takes no `--reply-to`; it answers nothing, so those turns
      come back from `next` until a later reply names them.
    - The helper sets the turn number, the UTC time, the header and your end marker.
-   - If it refuses because {PEER} posted in the meantime, go back to step 2 and revise your reply.
+   - If it refuses because {PEER} posted in the meantime (exit 3), go back to step 2 and revise your reply.
+   - Exit 4 means an unfinished or malformed turn in the file; tell {PEER} and do not write until it is fixed.
+     Exit 5 means the command was interrupted and may have written something; run `status`, compare,
+     then continue. Never retry blindly.
 5. **Wait** only when your next step depends on {PEER}. After a progress note, first finish the work you
    can do now. {WAIT_RECIPE} Then go back to step 2.
 

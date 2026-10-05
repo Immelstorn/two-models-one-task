@@ -7,7 +7,7 @@ import sys
 import time
 import unittest
 
-from support import IDENTICAL, MARKDOWN_LEGACY, MARKDOWN_SETTINGS, DUO, DuoCase, listing, sha
+from support import ADA_MARK, IDENTICAL, MARKDOWN_LEGACY, MARKDOWN_SETTINGS, DUO, DuoCase, listing, sha
 
 
 class Next(DuoCase):
@@ -128,6 +128,23 @@ class Wait(DuoCase):
         time.sleep(1)
 
         self.post(common, "Ada", "question", "Question.\n")
+        code = waiter.wait(timeout=15)
+
+        self.assertEqual(code, 0)
+
+    def test_wait_keeps_waiting_through_a_partial_write(self):
+        path, common = self.new_dialogue()
+        waiter = subprocess.Popen([sys.executable, str(DUO), "wait", *common, "--as", "Bo",
+                                   "--timeout", "30", "--interval", "0.2"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.addCleanup(waiter.kill)
+        time.sleep(1)
+
+        with path.open("ab") as handle:
+            handle.write(b"\n\n## Ada - 2026-10-05 17:30 UTC - Tur")
+        time.sleep(1)
+        with path.open("ab") as handle:
+            handle.write(f"n 1 - question\n\nQuestion.\n\n{ADA_MARK}\n".encode())
         code = waiter.wait(timeout=15)
 
         self.assertEqual(code, 0)

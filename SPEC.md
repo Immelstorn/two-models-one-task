@@ -1,6 +1,6 @@
 # duo.py contract (draft for review)
 
-Status: draft v2.1, 2026-10-05. Names marked *proposed* can still be amended
+Status: draft v2.2, 2026-10-05. Names marked *proposed* can still be amended
 once; the behaviour in sections 2 to 6 is what the tests in `tests/` enforce.
 
 ## 1. Scope
@@ -28,8 +28,11 @@ with a message naming the file. The helper never guesses a format, for reading o
 **Styles.** A header line names a configured participant exactly. Anything else is not a header.
 
 - `markdown`: `## NAME SEP TIME SEP Turn N SEP SUBJECT`. SEP is ` - `, or U+2014 (long dash) with a space
-  on each side in legacy files. TIME is kept as a raw string and never interpreted.
-- `banner`: `=== TURN N | NAME | TIME ===`.
+  on each side in legacy files. TIME is kept as a raw string and never interpreted. `append` always
+  writes this exact form. Reading is lenient about hand-written legacy variants: after `## NAME SEP TIME SEP`,
+  N is the first `Turn N` in the rest of the line ("Addendum to Turn 4 - ...", "Turn 5 (addendum) - ...").
+  A line starting with `## NAME SEP` that has no `Turn N` is malformed (exit 4, naming the line).
+- `banner`: `=== TURN N | NAME | TIME ===`. This header has no subject; `append` does not store `--subject`.
 
 **Segments.** A turn starts at its header line. It ends before the next line that is a header of either
 participant or, in `markdown` style, any other line starting with `# ` or `## ` (a section heading).
@@ -70,7 +73,7 @@ All commands take `--file PATH`, optional `--settings PATH`, and `--json` for on
 | `status` | Read-only summary. |
 | `tail --turns K` | Read-only; the last K turns with text. |
 | `next --as NAME` | Deliver every unresolved completed peer turn, in file order, and record a receipt for each. |
-| `wait --as NAME --timeout SEC [--interval SEC]` | Read-only; return when an unresolved completed peer turn exists that NAME has no receipt for. Redeliveries do not end a wait. |
+| `wait --as NAME --timeout SEC [--interval SEC]` | Read-only; return when an unresolved completed peer turn exists that NAME has no receipt for. Redeliveries do not end a wait. An incomplete or malformed tail seen while waiting (a write in progress) does not end it either; check again at the next interval. |
 | `append --as NAME --subject TEXT --body FILE [--reply-to KEY ...]` | Append one complete turn. `--reply-to` repeats; `--reply-to all` names every unresolved peer turn the writer has received. |
 
 There is no `amend`. Published turns are final; a correction is a new turn that names the turn it corrects.
@@ -118,7 +121,8 @@ There is no `amend`. Published turns are final; a correction is a new turn that 
 | 1 | Usage, settings, format, state, body or reply error; nothing written |
 | 2 | `next` had nothing to deliver; `wait` timed out |
 | 3 | `append` refused: unreceived peer turn |
-| 4 | `append` refused: incomplete tail turn |
+| 4 | Incomplete or malformed turn: `append` refuses to write; other commands report the line. Reconcile it first |
+| 5 | Interrupted write or output: bytes may already be committed. Run `status`, compare, then continue; do not retry blindly |
 
 ## 7. Tests
 
