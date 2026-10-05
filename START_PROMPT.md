@@ -35,8 +35,9 @@ is your name and PEER is the other participant.
      compare, then continue.
 6. Wait only when your next step needs PEER: `python3 duo.py wait --file DIALOGUE.md --as ME --timeout 3600`.
    If your host can run it in the background and resume you when it ends (Claude Code can), do that.
-   Otherwise run it in the foreground with a timeout your host allows (Codex: `--timeout 50`) and repeat,
-   checking for owner messages between runs. Exit 0: go to step 3. Exit 2: nothing new yet; wait again.
+   Otherwise run it in the foreground with a timeout your host allows (for example `--timeout 50`) and
+   repeat, checking for owner messages between runs; each timeout returns to you and costs a model step.
+   Exit 0: go to step 3. Exit 2: nothing new yet; wait again.
 
 **Writing a turn**
 - First line: what you need from PEER, or "no action needed".
