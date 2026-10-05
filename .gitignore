@@ -1,0 +1,6 @@
+*.lock
+*.state.json
+__pycache__/
+# The maintainers' local working dialogue and notes; never committed.
+DIALOGUE.md
+.local/
