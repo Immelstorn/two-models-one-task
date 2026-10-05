@@ -140,7 +140,7 @@ class OptionalRealFiles(DuoCase):
         if not pairs:
             self.skipTest("DUO_REAL_FILES not set")
         for pair in pairs:
-            dialogue, settings = (Path(p) for p in pair.split("::"))
+            dialogue, settings = (Path(p).resolve() for p in pair.split("::"))
             with self.subTest(dialogue=str(dialogue)):
                 before, files = sha(dialogue), listing(dialogue.parent)
 

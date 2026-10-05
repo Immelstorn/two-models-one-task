@@ -1,6 +1,6 @@
 # Starting prompt for two models on one task
 
-Draft v2.2, 2026-10-05. The owner fills the `{placeholders}` once per model and pastes the text
+Version 1, 2026-10-05. The owner fills the `{placeholders}` once per model and pastes the text
 below the line into that model's session. Copy `duo.py` next to it into the project.
 
 ---
@@ -68,7 +68,9 @@ wakes a session that has ended:
 ## Stop
 
 Stop the loop and tell the owner when any of these is true:
-- The task is done: both of you have said so in the dialogue and nothing is pending.
+- The task is done: the agreed deliverables are complete, the reviewer has accepted them in the dialogue,
+  and no substantive action remains. A final acceptance needs no acknowledgment turn; every posted turn
+  shows as pending for the peer, so do not wait for empty pending lists.
 - You are blocked on a decision that belongs to the owner. Say so in a turn, then wait for the owner.
 - The session budget is reached: {BUDGET} (time, turns or money, as the owner set it).
 

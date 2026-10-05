@@ -1,7 +1,6 @@
-# duo.py contract (draft for review)
+# duo.py contract
 
-Status: draft v2.2, 2026-10-05. Names marked *proposed* can still be amended
-once; the behaviour in sections 2 to 6 is what the tests in `tests/` enforce.
+Version 1, 2026-10-05 (milestone 1). `duo.py` implements it; the tests in `tests/` enforce sections 2 to 6.
 
 ## 1. Scope
 
@@ -14,7 +13,7 @@ once; the behaviour in sections 2 to 6 is what the tests in `tests/` enforce.
 
 ## 2. Dialogue format
 
-**Settings** (JSON, *proposed* field names):
+**Settings** (JSON):
 
 ```json
 {"duo": 1, "style": "markdown", "write_separator": " - ",
@@ -55,7 +54,7 @@ needs a separate migration, which M1 does not provide: removing the first of two
 turn key `H-2` into `H`. `id` (position in file order) and `number` (the displayed number) are for display.
 
 **Reply metadata.** Every helper-written turn has one metadata line as its last nonblank line before the
-marker, listing the keys it answers, possibly none (*proposed* format: `<!-- duo replies: KEY,KEY -->`).
+marker, listing the keys it answers, possibly none (format: `<!-- duo replies: KEY,KEY -->`).
 Turns without that line are legacy turns.
 
 **Resolved.** A completed peer turn P is resolved for me when a later completed turn of mine names P's key
@@ -78,11 +77,11 @@ All commands take `--file PATH`, optional `--settings PATH`, and `--json` for on
 
 There is no `amend`. Published turns are final; a correction is a new turn that names the turn it corrects.
 
-**Turn object** (*proposed*): `id`, `key`, `number`, `author`, `time`, `subject`, `complete`, `sha256`,
+**Turn object**: `id`, `key`, `number`, `author`, `time`, `subject`, `complete`, `sha256`,
 `line` (1-based header line), `replies` (list of keys, or `null` for a legacy turn); `next` and `tail` add
 `text`; `next` adds `redelivered`.
 
-**`status` object** (*proposed*): `turns`, `max_number`, `last`, `last_complete`, `incomplete_tail`,
+**`status` object**: `turns`, `max_number`, `last`, `last_complete`, `incomplete_tail`,
 `pending` (participant name to the keys of turns unresolved for them, in file order), `receipts`
 (list of `by`, `key`, `time`). `last` and `last_complete` are `null` when there is no such turn.
 
@@ -113,7 +112,7 @@ There is no `amend`. Published turns are final; a correction is a new turn that 
 
 `status`, `tail` and `wait` never change the dialogue or the state file and never create files.
 
-## 6. Exit codes (*proposed*)
+## 6. Exit codes
 
 | Code | Meaning |
 |---|---|
