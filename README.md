@@ -68,3 +68,9 @@ takes over 30 seconds prints a warning; the turn is still posted. Use `--no-wake
 | `SPEC.md` | The full contract `duo.py` meets. |
 | `tests/` | Acceptance tests: `python3 -m unittest discover -s tests -v`. |
 | `AGENTS.md` | Rules for agents working on this repository. |
+| `LICENSE` | MIT License. |
+
+## License
+
+MIT. See [LICENSE](LICENSE). You can use, change and share it freely; keep the copyright line that sits
+at the top of `duo.py`.

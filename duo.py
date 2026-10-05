@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Denys Volovenko. MIT License.
+# https://github.com/Immelstorn/two-models-one-task
 """Append-only dialogue coordination for two participants (Python 3.9+, POSIX).
 
-Copy this file and START_PROMPT.md. Runtime files are DIALOGUE.lock and
-DIALOGUE.state.json. All writers must use this helper, with one session per
+Copy this file and START_PROMPT.md. Runtime files sit next to the dialogue:
+PATH.lock and PATH.state.json. All writers must use this helper, with one session per
 participant. Optional registered commands notify the peer after a successful post.
 """
 from __future__ import annotations
