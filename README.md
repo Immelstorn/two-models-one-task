@@ -1,7 +1,7 @@
 # two-models-one-task
 
-Let two AI coding agents work on one task together: one builds, the other reviews. For example, Claude
-Code and Codex side by side.
+Let two AI coding agents, for example Claude Code and Codex, work on one task together. They plan
+together, split the work by what each does best, and review each other's work.
 
 They talk through one shared file, `DIALOGUE.md`, using a small helper, `duo.py`. The helper numbers and
 timestamps every message, stops the agents from talking over each other, tracks what each one still has
@@ -12,7 +12,7 @@ to answer, and wakes the other agent when a new message arrives.
 1. Copy `duo.py` into your project root.
 2. Open Claude Code and Codex in the project root. Paste the whole of [`START_PROMPT.md`](START_PROMPT.md)
    into each, unchanged. There is nothing to fill in.
-3. Tell one of them the task. That one builds; the other reviews.
+3. Tell either of them the task. They agree on a plan, split the work and review each other's parts.
 
 Then watch `DIALOGUE.md`. The agents tell you when a decision is yours and when the work is done.
 
@@ -43,11 +43,11 @@ All commands take `--file DIALOGUE.md`. The agents run them; you normally don't 
 | Command | What it does |
 |---|---|
 | `status` | Turn count, last turn, what is pending for whom. Read-only. |
-| `next --as Ada` | Gives Ada every unanswered turn from Bo and records that Ada received it. |
-| `append --as Ada --subject "..." --body reply.md --reply-to all` | Posts Ada's turn, then runs Bo's wake command if Bo has one. Refused if Bo posted something Ada has not received. |
-| `wait --as Ada --timeout 3600` | Returns when Bo posts something new. Read-only. |
-| `wake --as Ada --exec COMMAND` | Saves the command Bo runs after posting, to wake Ada. |
-| `wake --as Ada --clear` | Removes Ada's wake command. |
+| `next --as Claude` | Gives Claude every unanswered turn from Codex and records that Claude received it. |
+| `append --as Claude --subject "..." --body reply.md --reply-to all` | Posts Claude's turn, then runs Codex's wake command if Codex has one. Refused if Codex posted something Claude has not read. |
+| `wait --as Claude --timeout 3600` | Returns when Codex posts something new. Read-only. |
+| `wake --as Codex --exec COMMAND` | Saves the command Claude runs after posting, to wake Codex. |
+| `wake --as Codex --clear` | Removes Codex's wake command. |
 
 Wake commands run with the poster's permissions, so both sides must trust them. A wake that fails or
 takes over 30 seconds prints a warning; the turn is still posted. Use `--no-wake` for notes that need no reply.

@@ -23,9 +23,10 @@ is your name and PEER is the other participant.
    `python3 duo.py wake --file DIALOGUE.md --as ME --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'New peer turn in DIALOGUE.md: run duo.py next as your participant and continue.'"`.
    Expand the ID now, so the peer targets your session when posting. The command runs with the peer's
    permissions; both sides must trust it. Claude Code can use background wait without a registration.
-2. If the owner gave you the task, you implement: post the task brief as the first turn (step 5),
-   quoting the owner's words exactly. If the owner gave you no task, you review: wait for the brief.
-   If PEER posts a brief before you (exit 3 in step 5), you review. The owner can assign roles differently.
+2. If the owner gave you the task, post it as the first turn (step 5), quoting the owner's words exactly.
+   If the owner gave you no task, wait for that turn. If both of you got it, whoever posts second gets
+   exit 3 in step 5: read the brief instead of posting it again. Then plan together (see "Working
+   together") before anyone starts building.
 
 **Loop**
 3. Get work: `python3 duo.py next --file DIALOGUE.md --as ME`. It shows every PEER turn you have not
@@ -61,12 +62,17 @@ is your name and PEER is the other participant.
   post the whole new brief as "Brief v2", not a patch.
 
 **Working together**
-- The implementer builds; the reviewer checks independently and reproduces results.
-- One review of the plan and one final review. Must-fix items only; no polishing rounds.
+- There are no fixed roles. Either of you can plan, build, test, research or review.
+- Plan together: one proposes, the other improves it, and you agree in the dialogue. Split the work into
+  parts and give each part to whoever is better at it, with a one-line reason (for example, one builds the
+  dashboards and the other writes the tests). Either of you can propose a different split at any time.
+- Name the files each part touches. Never edit a file the other is working on; hand it over in a turn first.
+- The one who did not make a part reviews it and reproduces its results. One review of the plan and one
+  final review of each part. Must-fix items only; no polishing rounds.
 - Disagree openly, with evidence. Do not agree just to be agreeable.
 
 **Stop** and tell the owner when:
-- the work is done and the reviewer has accepted it (a final acceptance needs no reply);
+- every part of the plan is done and accepted by the other agent (a final acceptance needs no reply);
 - a decision belongs to the owner (say so in a turn, then wait for the owner);
 - you reach a limit the owner set (time, turns or money).
 

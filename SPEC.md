@@ -18,8 +18,8 @@ Version 2, 2026-10-05 (file helper and peer wake commands). `duo.py` implements 
 
 ```json
 {"duo": 1, "style": "markdown", "write_separator": " - ",
- "participants": [{"name": "Ada", "marker": "ADA_DONE_WAITING_FOR_BO"},
-                  {"name": "Bo", "marker": "BO_DONE_WAITING_FOR_ADA"}]}
+ "participants": [{"name": "Claude", "marker": "CLAUDE_DONE_WAITING_FOR_CODEX"},
+                  {"name": "Codex", "marker": "CODEX_DONE_WAITING_FOR_CLAUDE"}]}
 ```
 
 Resolution order: a settings block embedded in the file by `init`; else `--settings FILE`; else exit 1
