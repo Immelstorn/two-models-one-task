@@ -6,9 +6,12 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
+import sys
+import time
 from unittest.mock import patch
 
-from support import DuoCase, DUO, LONG_DASH_ONLY, MARKDOWN_SETTINGS, sha
+from support import ADA_MARK, DuoCase, DUO, LONG_DASH_ONLY, MARKDOWN_SETTINGS, sha
 
 spec = importlib.util.spec_from_file_location('duo_under_test', DUO)
 duo = importlib.util.module_from_spec(spec)
@@ -88,3 +91,21 @@ class FailureRecovery(DuoCase):
         self.duo('next', *common, '--as', 'Bo', expect=0)
         self.post(common, 'Bo', 'reply', 'Done.\n', expect=1)
         self.assertEqual(path.read_bytes(), original)
+
+    def test_wait_survives_a_utf8_character_split_across_writes(self):
+        path, common = self.new_dialogue()
+        payload = ('\n\n## Ada - 2026-10-05 17:30 UTC - Turn 1 - note\n\n'
+                   'Check \U0001f30d.\n\n' + ADA_MARK + '\n').encode('utf-8')
+        cut = payload.index('\U0001f30d'.encode('utf-8')) + 2
+        with path.open('ab') as handle:
+            handle.write(payload[:cut])
+        waiter = subprocess.Popen([sys.executable, str(DUO), 'wait', *common, '--as', 'Bo',
+                                   '--timeout', '5', '--interval', '0.05', '--json'],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.addCleanup(waiter.kill)
+        time.sleep(0.5)
+        with path.open('ab') as handle:
+            handle.write(payload[cut:])
+        output, errors = waiter.communicate(timeout=6)
+        self.assertEqual(waiter.returncode, 0, errors)
+        self.assertEqual(json.loads(output)['turns'][0]['number'], 1)

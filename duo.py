@@ -97,8 +97,7 @@ def patterns(settings):
     names = '|'.join(re.escape(p['name']) for p in settings['participants'])
     if settings['style'] == 'markdown':
         return re.compile(r'^## (?P<author>' + names + r')(?P<separator> - | \u2014 )'
-                          r'(?P<time>.+?)(?P=separator)Turn (?P<number>[0-9]+)'
-                          r'(?P=separator)(?P<subject>.*)$')
+                          r'(?P<time>.+?)(?P=separator)(?P<legacy_label>.*)$')
     return re.compile(r'^=== TURN (?P<number>[0-9]+) \| (?P<author>' + names +
                       r') \| (?P<time>.+) ===$')
 
@@ -144,14 +143,25 @@ def parse_turns(data, settings):
     for index, raw in enumerate(lines):
         line = raw.decode('utf-8').rstrip('\r\n')
         match = header.fullmatch(line)
+        new_fields = match.groupdict() if match else None
+        if new_fields is not None and settings['style'] == 'markdown':
+            label = new_fields.pop('legacy_label')
+            number = re.search(r'\bTurn ([0-9]+)\b', label)
+            if number is None:
+                new_fields = None
+            else:
+                new_fields['number'] = number[1]
+                remainder = label[number.end():]
+                _, separator, subject = remainder.partition(new_fields['separator'])
+                new_fields['subject'] = subject if separator else remainder.strip()
         partial = (index == len(lines) - 1 and not raw.endswith(b'\n') and line
                    and any(prefix.startswith(line) for prefix in beginnings))
-        if not match and (partial or any(line.startswith(prefix) for prefix in beginnings)):
+        if new_fields is None and (partial or any(line.startswith(prefix) for prefix in beginnings)):
             raise DuoError(f'line {index + 1}: incomplete or malformed turn header; reconcile it explicitly', 4)
         section = settings['style'] == 'markdown' and line.startswith(('# ', '## '))
-        if match or section:
+        if new_fields is not None or section:
             finish(index)
-            start, fields = (index, match.groupdict()) if match else (None, None)
+            start, fields = (index, new_fields) if new_fields is not None else (None, None)
     finish(len(lines))
     return turns
 
@@ -406,7 +416,22 @@ def append_turn(args, path):
 def read_command(args, path):
     deadline = time.monotonic() + args.timeout if args.command == 'wait' else None
     while True:
-        data, settings, turns, state, received, pending = snapshot(path, args.settings)
+        try:
+            data, settings, turns, state, received, pending = snapshot(path, args.settings)
+        except (DuoError, UnicodeDecodeError) as exc:
+            # Readers do not lock writers. A snapshot can end in a partial
+            # header or UTF-8 character while an append is still in progress.
+            partial = ((isinstance(exc, DuoError) and exc.code == 4)
+                       or (isinstance(exc, UnicodeDecodeError)
+                           and exc.reason == 'unexpected end of data'
+                           and exc.end == len(exc.object)))
+            if args.command != 'wait' or not partial:
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return {'turns': []}, 2
+            time.sleep(min(args.interval, remaining))
+            continue
         if args.command == 'status':
             complete = [t for t in turns if t['complete']]
             return {'turns': len(turns), 'max_number': max((t['number'] for t in turns), default=0),
