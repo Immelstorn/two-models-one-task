@@ -9,10 +9,12 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 usage: duo [-l AGENT[:LENS]] [-r AGENT[:LENS]] [-d] [TASK...]
+       duo -u
 
   -l   left agent  (default: claude)
   -r   right agent (default: codex)
   -d   start detached; attach later with: tmux attach -t duo-<folder>
+  -u   update duo to the latest version and relink the skill
 
 AGENT is claude, codex, claude/MODEL or codex/MODEL. A bare Claude model such as opus, sonnet or
 haiku means claude/that-model. MODEL is passed to the agent's --model option.
@@ -29,11 +31,12 @@ EOF
 }
 
 left=claude right=codex detached=
-while getopts ":l:r:dh" option; do
+while getopts ":l:r:duh" option; do
   case $option in
     l) left=$OPTARG ;;
     r) right=$OPTARG ;;
     d) detached=1 ;;
+    u) exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install.sh" ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac
