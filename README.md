@@ -29,6 +29,7 @@ launcher to `~/.local/bin`. Nothing is cloned into your folders.
 | `/duo add a latency dashboard, with tests` | `$duo add a latency dashboard, with tests` |
 
 Giving the task to one of them is enough; the other picks it up from the dialogue. No task? They ask you.
+
 Want a lens? Say it in plain words: `$duo lens skeptic: review the login flow`.
 
 **3. Let them work.** They plan, build and review each other on their own. You only hear from them in
@@ -60,7 +61,8 @@ duo -l codex -r codex/MODEL "task"      # two Codex models
 ```
 
 A lens changes how an agent thinks, not what it may work on. Run `duo -h` for all options.
-In tmux: `Ctrl-b` and an arrow key switches panes, `Ctrl-b d` detaches, `tmux attach -t duo-<folder>` returns.
+
+**In tmux:** `Ctrl-b` and an arrow key switches panes, `Ctrl-b d` detaches, `tmux attach -t duo-<folder>` returns.
 
 ## 📋 No install? Paste instead
 
