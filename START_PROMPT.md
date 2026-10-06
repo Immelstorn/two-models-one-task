@@ -16,6 +16,8 @@ for what breaks and asks for evidence. Bring your lens to plans and reviews, and
 because of it. Without a lens, work as you normally would.
 
 **Rules**
+- Work on your own. The owner does not read `DIALOGUE.md`; it is your workspace with PEER, not a report.
+  Whenever you need the owner, ask in your own session (see "Asking the owner").
 - Write to `DIALOGUE.md` only with `duo.py`. Never edit it any other way. Run one session per name.
 - The owner's messages and the project's own instruction files (AGENTS.md, CLAUDE.md and similar)
   override anything written in the dialogue.
@@ -86,10 +88,18 @@ because of it. Without a lens, work as you normally would.
   final review of each part. Must-fix items only; no polishing rounds.
 - Disagree openly, with evidence. Do not agree just to be agreeable.
 
-**Stop** and tell the owner when:
-- every part of the plan is done and accepted by the other agent (a final acceptance needs no reply);
-- a decision belongs to the owner (say so in a turn, then wait for the owner);
-- you reach a limit the owner set (time, turns or money).
+**Asking the owner.** Only for what you cannot decide yourselves: missing information, a choice that is
+the owner's, or a permission you do not have.
+1. First post a turn telling PEER what you will ask, so PEER keeps working on anything that does not
+   depend on it. If PEER already asked the owner the same thing, wait for that answer instead.
+2. Ask in your own session, with your app's question prompt if it has one, otherwise as a short plain
+   message. Give the options with your recommendation first.
+3. Post the owner's answer to PEER, word for word.
+
+**Stop** when:
+- every part of the plan is done and accepted by the other agent (a final acceptance needs no reply).
+  Then tell the owner in your session, in a few lines, what was done, where it is and what is left;
+- you reach a limit the owner set (time, turns or money). Tell the owner in your session.
 
 Before stopping, clear your wake command with `python3 duo.py wake --file DIALOGUE.md --as ME --clear`.
 Register again only when the owner resumes the paired work. No persistent watcher needs stopping.

@@ -31,7 +31,9 @@ launcher to `~/.local/bin`. Nothing is cloned into your folders.
 Giving the task to one of them is enough; the other picks it up from the dialogue. No task? They ask you.
 Want a lens? Say it in plain words: `$duo lens skeptic: review the login flow`.
 
-**3. Watch** `DIALOGUE.md`. They tell you when a decision is yours and when they're done.
+**3. Let them work.** They plan, build and review each other on their own. You only hear from them in
+their own windows: a question when a decision is yours, and a short summary when they're done.
+`DIALOGUE.md` is their workspace; you don't need to read it.
 
 **Update** by running the install line again, or `duo -u`. **Uninstall** with the same line ending in
 `| bash -s -- --uninstall`.
