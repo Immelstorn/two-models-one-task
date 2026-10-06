@@ -14,7 +14,8 @@ usage: duo [-l AGENT[:LENS]] [-r AGENT[:LENS]] [-d] [TASK...]
   -r   right agent (default: codex)
   -d   start detached; attach later with: tmux attach -t duo-<folder>
 
-AGENT is claude, codex, or a Claude model such as opus, sonnet or haiku.
+AGENT is claude, codex, claude/MODEL or codex/MODEL. A bare Claude model such as opus, sonnet or
+haiku means claude/that-model. MODEL is passed to the agent's --model option.
 LENS is an optional way of thinking, in plain words, for example builder, skeptic or security.
 Two identical agents get the lenses builder and skeptic unless you set lenses yourself.
 
@@ -23,6 +24,7 @@ examples:
   duo -l opus -r sonnet "refactor the parser"
   duo -l opus -r opus "find the memory leak"
   duo -l opus:security -r codex "review the login flow"
+  duo -l codex -r codex/MODEL "compare two Codex models"
 EOF
 }
 
@@ -41,11 +43,15 @@ task="$*"
 
 agent_of() { printf '%s' "${1%%:*}"; }
 lens_of() { case $1 in *:*) printf '%s' "${1#*:}" ;; esac; }
+program_of() { case $1 in codex | codex/*) printf 'codex' ;; *) printf 'claude' ;; esac; }
+model_of() { case $1 in */*) printf '%s' "${1#*/}" ;; claude | codex) ;; *) printf '%s' "$1" ;; esac; }
 name_of() {
+  local model
   case $1 in
+    codex | codex/*) printf 'Codex' ;;
     claude) printf 'Claude' ;;
-    codex) printf 'Codex' ;;
-    *) printf '%s%s' "$(printf '%s' "${1:0:1}" | tr '[:lower:]' '[:upper:]')" "${1:1}" ;;
+    *) model=$(model_of "$1")
+       printf '%s%s' "$(printf '%s' "${model:0:1}" | tr '[:lower:]' '[:upper:]')" "${model:1}" ;;
   esac
 }
 
@@ -67,11 +73,11 @@ build() {
   if [ -n "$lens" ]; then text="$text; lens: $lens"; fi
   text="$text."
   if [ -n "$task" ]; then text="$text Task: $task"; fi
-  case $agent in
-    codex) command=(codex "\$duo $text") ;;
-    claude) command=(claude "/duo $text") ;;
-    *) command=(claude --model "$agent" "/duo $text") ;;
-  esac
+  local program model
+  program=$(program_of "$agent") model=$(model_of "$agent")
+  command=("$program")
+  if [ -n "$model" ]; then command+=(--model "$model"); fi
+  if [ "$program" = codex ]; then command+=("\$duo $text"); else command+=("/duo $text"); fi
 }
 
 session="duo-$(basename "$PWD" | tr '.:' '__')"

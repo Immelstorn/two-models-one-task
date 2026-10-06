@@ -73,6 +73,20 @@ class Launcher(unittest.TestCase):
                          [["--model", "opus", "/duo participants: Opus and Codex; you are Opus; lens: security."]])
         self.assertEqual(self.args_of("codex"), [["$duo participants: Opus and Codex; you are Codex."]])
 
+    def test_two_codex_models(self):
+        self.launch("-l", "codex/model-a", "-r", "codex/model-b", "compare")
+
+        self.assertEqual(self.args_of("codex", panes=2), [
+            ["--model", "model-a", "$duo participants: Codex1 and Codex2; you are Codex1. Task: compare"],
+            ["--model", "model-b", "$duo participants: Codex1 and Codex2; you are Codex2. Task: compare"]])
+
+    def test_same_codex_twice_gets_two_lenses(self):
+        self.launch("-l", "codex", "-r", "codex", "compare")
+
+        self.assertEqual(self.args_of("codex", panes=2), [
+            ["$duo participants: Codex1 and Codex2; you are Codex1; lens: builder. Task: compare"],
+            ["$duo participants: Codex1 and Codex2; you are Codex2; lens: skeptic. Task: compare"]])
+
     def test_a_running_session_is_not_replaced(self):
         self.launch("first")
 

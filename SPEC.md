@@ -7,7 +7,6 @@ Version 2, 2026-10-05 (file helper and peer wake commands). `duo.py` implements 
 
 - One stdlib-only Python file, `duo.py`, plus `START_PROMPT.md`. Tests and this spec are not copied.
 - Supported: Python 3.9 or newer on macOS and Linux (locking uses `fcntl`). Windows is out of scope.
-  Linux stays a declared target until the suite has run there.
 - Exactly two participants per dialogue file, and one active session per participant. The crossing guard
   cannot tell two sessions with the same name apart.
 - Includes the file helper, prompt and optional peer wake commands. No persistent watcher or controller.
@@ -135,11 +134,9 @@ are `null` when there is no such turn.
   and reply tracking remain the source of truth. No notification retries, cursor or background process.
 - The command runs with the writer's permissions; register only commands both sides trust.
 - Example for Codex, registered once at the start (the variable expands at registration):
-  `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'New turn in DIALOGUE.md: run duo.py next.'"`.
-  Require a nonempty ID before registering. A local Codex CLI 0.154.0 desktop test recorded a new turn
-  about 1.3 seconds after the reported idle queue time (queue time had one-second precision). This is
-  one observation, not a latency guarantee. The writer needs `codex` on PATH and permission to access
-  Codex's local state; a filesystem sandbox can prevent dispatch. Closed-app delivery is untested.
+  `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'duo: Claude posted a new turn in DIALOGUE.md. This is not an owner message. Run duo.py next as Codex and continue.'"`.
+  Require a nonempty ID before registering. The writer needs `codex` on PATH and permission to access
+  Codex's local state; a filesystem sandbox can prevent dispatch.
 - A Claude Code participant can register nothing and keep a background `wait`, which makes no model
   calls while it sleeps. Clear your registration when leaving the paired session.
 

@@ -39,9 +39,6 @@ Giving the task to one of them is enough. The other can get just `/duo` or `$duo
 task, and takes it from the dialogue as soon as the first one posts it. Without any task, both ask you. You can add a lens or names in plain words,
 for example `$duo lens skeptic: review the login flow`.
 
-Tested so far: `/duo` in Claude Code and `$duo` in the Codex CLI. Codex documents skills in its desktop
-app too, but `$duo` there has not been tested yet.
-
 ### Or start both from a terminal
 
 The `duo` launcher opens tmux with both agents side by side and starts the skill in each. Put it on your
@@ -63,13 +60,15 @@ they ask you for one.
 ### Choosing the pair
 
 Two agents help most when they differ. `-l` and `-r` pick the left and right agent: `claude`, `codex`,
-or a Claude model such as `opus` or `sonnet`. Add `:lens` to give one a way of thinking, in plain words.
+`claude/MODEL`, `codex/MODEL`, or a Claude model such as `opus` or `sonnet` on its own. Add `:lens` to
+give one a way of thinking, in plain words.
 
 ```bash
 duo "task"                              # Claude Code + Codex
 duo -l opus -r sonnet "task"            # two Claude models
 duo -l opus -r opus "task"              # the same model twice: lenses builder and skeptic are added
 duo -l opus:security -r codex "task"    # your own lens for one side
+duo -l codex -r codex/MODEL "task"      # two Codex models
 ```
 
 A lens shapes how an agent thinks, not which work it may take: a builder looks for the simplest thing
@@ -119,8 +118,8 @@ Using other models? Edit the first line of `START_PROMPT.md` (`Participants: Cla
 - **Nothing gets lost.** A turn stays pending until a reply names it. After a crash or restart, the agent
   gets its unanswered turns again.
 - **Waking up costs nothing while idle.**
-  - When Claude posts, `duo.py` runs the wake command Codex registered at startup (`codex queue`). On the
-    Codex desktop app this started a new Codex turn within seconds.
+  - When Claude posts, `duo.py` runs the wake command Codex registered at startup (`codex queue`), which
+    starts a new Codex turn within seconds.
   - Claude waits with a background `duo.py wait`: a sleeping process that makes no model calls.
 - **Wake-ups are labelled.** A wake message starts with `duo:`, so the receiving agent knows it comes from
   the other agent, not from you. It only means "check the dialogue" and grants no permission.
@@ -143,12 +142,12 @@ takes over 30 seconds prints a warning; the turn is still posted. Use `--no-wake
 
 ## Limits
 
-- Keep both apps open. Waking a closed Codex app is untested, and nothing restarts a closed session.
+- Keep both apps open: nothing wakes or restarts a closed session.
 - Two Claude sessions each wait with a background `wait`, since Claude has no command to wake another
-  session. Two Codex sessions would need `codex queue` outside the sandbox; untested.
+  session. Two Codex sessions wake each other only if `codex queue` can run outside the Codex sandbox.
 - A wake is one attempt, not guaranteed delivery. The dialogue file is always the source of truth.
 - One session per participant name, and nothing else may edit the dialogue file.
-- Windows is not supported (the lock uses `fcntl`). Linux is untested.
+- macOS and Linux only; Windows is not supported (the lock uses `fcntl`).
 
 ## Repository
 
