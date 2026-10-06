@@ -36,7 +36,8 @@ while getopts ":l:r:duh" option; do
     l) left=$OPTARG ;;
     r) right=$OPTARG ;;
     d) detached=1 ;;
-    u) exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/install.sh" ;;
+    u) curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash
+       exit ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac

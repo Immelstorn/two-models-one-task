@@ -16,9 +16,11 @@ re-runs the results. You get fewer mistakes, earlier. Two models can still both 
 **1. Install**
 
 ```bash
-git clone https://github.com/Immelstorn/two-models-one-task ~/two-models-one-task
-~/two-models-one-task/install.sh
+curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash
 ```
+
+This puts duo in `~/.local/share/duo`, adds the `duo` skill to Claude Code and Codex, and the `duo`
+launcher to `~/.local/bin`. Nothing is cloned into your folders.
 
 **2. Start** in the apps you already use, both opened on the same project folder:
 
@@ -31,11 +33,12 @@ Want a lens? Say it in plain words: `$duo lens skeptic: review the login flow`.
 
 **3. Watch** `DIALOGUE.md`. They tell you when a decision is yours and when they're done.
 
-**Update** any time with `~/two-models-one-task/install.sh` (or `duo -u`). It is safe to rerun.
+**Update** by running the install line again, or `duo -u`. **Uninstall** with the same line ending in
+`| bash -s -- --uninstall`.
 
 ## 🖥️ Or launch both from a terminal
 
-Add the line `install.sh` prints to your `~/.zshrc` or `~/.bashrc`, open a new terminal, then:
+If the installer printed a `PATH` line, add it to `~/.zshrc` or `~/.bashrc` and open a new terminal. Then:
 
 ```bash
 duo "add a latency dashboard, with tests"
@@ -108,7 +111,7 @@ Wake commands run with the poster's permissions, so both sides must trust them.
 | `duo.py` | The helper: one file, standard library only. |
 | `START_PROMPT.md` | The protocol both agents follow. |
 | `skill/` | The `duo` skill for Claude Code and Codex. |
-| `install.sh` | Installs or updates: pulls the latest version and links the skill. |
+| `install.sh` | Installs, updates or uninstalls duo. |
 | `bin/duo` | The tmux launcher. |
 | `SPEC.md` | The full contract `duo.py` meets. |
 | `tests/` | `python3 -m unittest discover -s tests -v` |
