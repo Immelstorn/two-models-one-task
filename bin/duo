@@ -9,12 +9,13 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 usage: duo [-l AGENT[:LENS]] [-r AGENT[:LENS]] [-d] [TASK...]
-       duo -u
+       duo --update | --uninstall
 
   -l   left agent  (default: claude)
   -r   right agent (default: codex)
   -d   start detached; attach later with: tmux attach -t duo-<folder>
-  -u   update duo to the latest version and relink the skill
+  --update      update duo to the latest version (also -u)
+  --uninstall   remove duo and its skill links
 
 AGENT is claude, codex, claude/MODEL or codex/MODEL. A bare Claude model such as opus, sonnet or
 haiku means claude/that-model. MODEL is passed to the agent's --model option.
@@ -30,14 +31,33 @@ examples:
 EOF
 }
 
+update() {
+  curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash
+}
+
+# Runs the installed copy of install.sh, found next to the real location of this script.
+uninstall() {
+  local self=${BASH_SOURCE[0]} target
+  while [ -L "$self" ]; do
+    target=$(readlink "$self")
+    case $target in /*) self=$target ;; *) self=$(dirname "$self")/$target ;; esac
+  done
+  exec bash "$(cd "$(dirname "$self")/.." && pwd)/install.sh" --uninstall
+}
+
+case ${1:-} in
+  --update) update; exit ;;
+  --uninstall) uninstall ;;
+  --help) usage; exit 0 ;;
+esac
+
 left=claude right=codex detached=
 while getopts ":l:r:duh" option; do
   case $option in
     l) left=$OPTARG ;;
     r) right=$OPTARG ;;
     d) detached=1 ;;
-    u) curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash
-       exit ;;
+    u) update; exit ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac

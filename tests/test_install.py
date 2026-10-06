@@ -76,6 +76,17 @@ class Install(unittest.TestCase):
             self.assertFalse(link.is_symlink())
         self.assertTrue(other.is_dir())
 
+    def test_duo_uninstall_runs_the_installed_copy(self):
+        self.install("--from", str(ROOT))
+
+        done = subprocess.run([str(self.home / ".local/bin/duo"), "--uninstall"], env=self.env,
+                              capture_output=True, text=True, timeout=60)
+
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("removed", done.stdout)
+        self.assertFalse(self.installed.exists())
+        self.assertFalse((self.home / ".local/bin/duo").is_symlink())
+
 
 if __name__ == "__main__":
     unittest.main()

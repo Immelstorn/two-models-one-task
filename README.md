@@ -35,8 +35,9 @@ Want a lens? Say it in plain words: `$duo lens skeptic: review the login flow`.
 their own windows: a question when a decision is yours, and a short summary when they're done.
 `DIALOGUE.md` is their workspace; you don't need to read it.
 
-**Update** by running the install line again, or `duo -u`. **Uninstall** with the same line ending in
-`| bash -s -- --uninstall`.
+**Update** any time with `duo --update`.
+
+**Uninstall** with `duo --uninstall`.
 
 ## 🖥️ Or launch both from a terminal
 
