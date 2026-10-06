@@ -12,7 +12,7 @@ to answer, and wakes the other agent when a new message arrives.
 1. Copy `duo.py` into your project root.
 2. Open Claude Code and Codex in the project root, or start both at once with the
    [tmux shortcut](#both-sessions-in-one-terminal) below.
-3. Copy [`START_PROMPT.md`](START_PROMPT.md) and put your task on its second line, for example
+3. Copy [`START_PROMPT.md`](START_PROMPT.md) and put your task on its `Task:` line, for example
    `Task: add a Grafana dashboard for API latency, with tests.`
 4. Paste the whole prompt into both sessions. If you leave the `Task:` line as it is, the agents ask
    you for the task.

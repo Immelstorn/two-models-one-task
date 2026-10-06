@@ -1,4 +1,5 @@
 Participants: Claude and Codex
+
 Task: [paste your task here]
 
 You work with another AI agent on one task. You talk to it only through the file `DIALOGUE.md`, using
