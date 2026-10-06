@@ -5,11 +5,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+
+# Tests must never act as a real agent session: inside Codex, CODEX_THREAD_ID would make duo.py
+# register wake commands that queue messages to that real session.
+for _name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "DUO_NO_AUTO_WAKE"):
+    os.environ.pop(_name, None)
 
 ROOT = Path(__file__).resolve().parents[1]
 DUO = ROOT / "duo.py"
@@ -192,9 +198,12 @@ class DuoCase(unittest.TestCase):
         self.duo("init", "--file", str(path), "--names", "Ada,Bo", expect=0)
         return path, ["--file", str(path)]
 
-    def duo(self, *args: str, expect: int | None = None) -> subprocess.CompletedProcess:
+    def duo(self, *args: str, expect: int | None = None, env: dict | None = None) -> subprocess.CompletedProcess:
+        # Never inherit a real agent session: inside Codex, CODEX_THREAD_ID would trigger wake registration.
+        clean = {k: v for k, v in os.environ.items()
+                 if k not in ("CODEX_THREAD_ID", "CODEX_SESSION_ID") and not k.startswith("DUO_")}
         done = subprocess.run([sys.executable, str(DUO), *args], capture_output=True,
-                              text=True, cwd=self.dir, timeout=60)
+                              text=True, cwd=self.dir, timeout=60, env={**clean, **(env or {})})
         if expect is not None:
             self.assertEqual(done.returncode, expect,
                              f"duo {' '.join(args)}\nstdout: {done.stdout}\nstderr: {done.stderr}")

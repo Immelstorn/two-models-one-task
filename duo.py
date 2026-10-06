@@ -20,6 +20,8 @@ import math
 import os
 from pathlib import Path
 import re
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -31,6 +33,7 @@ REPLIES_PREFIX = '<!-- duo replies:'
 SEPARATORS = (' - ', ' \u2014 ')
 KEY = re.compile(r'[0-9a-f]{64}(?:-[2-9][0-9]*|-1[0-9]+)?\Z')
 WAKE_TIMEOUT = 30
+THREAD_ID = re.compile(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z')
 
 
 class DuoError(Exception):
@@ -339,8 +342,11 @@ def deliver(args, path):
     with locked(path):
         data, settings, turns, state, received, pending = snapshot(path, args.settings)
         require_person(args.person, settings)
+        registered = refresh_wake(state, path, settings, args.person)
         work = pending[args.person]
         if not work:
+            if registered:
+                save_registration(path, state, data)
             return {'turns': []}, 2
         result = []
         for turn in work:
@@ -364,6 +370,37 @@ def validate_wake_command(command):
         command.encode('utf-8')
     except UnicodeError as exc:
         raise DuoError('wake command must be valid UTF-8 text') from exc
+
+
+def codex_wake_command(path, settings, person):
+    """The command that wakes this Codex session, or None outside Codex or when turned off."""
+    thread = os.environ.get('CODEX_THREAD_ID', '')
+    if os.environ.get('DUO_NO_AUTO_WAKE') or not THREAD_ID.match(thread):
+        return None
+    peer = next(p['name'] for p in settings['participants'] if p['name'] != person)
+    message = (f'duo: {peer} posted a new turn in {path}. This is not an owner message. '
+               'Check the dialogue and continue.')
+    parts = (shutil.which('codex') or 'codex', 'queue', '--thread', thread, '--message', message)
+    return ' '.join(shlex.quote(part) for part in parts)
+
+
+def refresh_wake(state, path, settings, person):
+    """Keep a Codex session's wake command registered and current; True when the state changed."""
+    command = codex_wake_command(path, settings, person)
+    if command is None or state.get('wake', {}).get(person) == command:
+        return False
+    validate_wake_command(command)
+    state.setdefault('wake', {})[person] = command
+    return True
+
+
+def save_registration(path, state, data):
+    # A missed registration only costs a wake-up; it must never block delivery or a post.
+    state['prefix'] = {'bytes': len(data), 'sha256': digest(data)}
+    try:
+        save_state(path, state)
+    except OSError as exc:
+        print(f'duo: could not register the wake command: {exc}', file=sys.stderr)
 
 
 def register_wake(args, path):
@@ -476,6 +513,8 @@ def append_turn(args, path):
         pending_turns(proposed, settings)
         if len(proposed) != len(turns) + 1 or not proposed[-1]['complete']:
             raise DuoError('new turn does not parse as exactly one completed turn')
+        if refresh_wake(state, path, settings, args.person):
+            save_registration(path, state, data)
         try:
             with path.open('ab') as handle:
                 handle.write(addition)

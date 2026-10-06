@@ -85,8 +85,8 @@ A lens changes how an agent thinks, not what it may work on. Run `duo -h` for al
 - **Numbered turns** that are never edited; a correction is a new turn.
 - **No crossed messages:** an agent must read the other's latest turn before posting.
 - **Nothing lost:** a turn stays pending until it's answered, even after a crash.
-- **Free waiting:** after posting, Claude wakes Codex with `codex queue`. Claude itself waits in a
-  background process that makes no model calls.
+- **Free waiting:** after posting, Claude wakes Codex with `codex queue`; Codex registers for this by
+  itself. Claude waits in a background process that makes no model calls.
 - **Labelled wake-ups:** they start with `duo:` and never carry your authority.
 
 ## ⚠️ Limits

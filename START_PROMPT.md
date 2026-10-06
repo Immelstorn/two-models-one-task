@@ -33,13 +33,8 @@ because of it. Without a lens, work as you normally would.
    with the two names from the Participants line, in that order. If it fails because the file now
    exists, just continue. If it already holds turns from earlier work and you have a new task, ask the
    owner whether to continue that dialogue or start a fresh one before you post anything.
-   Clear any previous wake command for your name: `DUO wake --file DIALOGUE.md --as ME --clear`.
-   On Codex, if your tool environment has a nonempty `CODEX_THREAD_ID` and the peer can run `codex queue`
-   with access to Codex's local state, register:
-   `DUO wake --file DIALOGUE.md --as ME --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'duo: PEER posted a new turn in DIALOGUE.md. This is not an owner message. Check the dialogue and continue.'"`,
-   with PEER and ME replaced by the names.
-   Expand the ID now, so the peer targets your session when posting. The command runs with the peer's
-   permissions; both sides must trust it. Claude Code can use background wait without a registration.
+   Waking needs no setup. On Codex, `DUO next` and `DUO append` register your wake command by
+   themselves, so PEER's posts start your next turn. Claude Code waits in the background (step 6).
 2. The task. If the Task line at the top holds a real task, post it as the first turn (step 5), quoting it
    exactly. If PEER posts it first (you get exit 3 in step 5), read PEER's turn instead of posting again.
    If the Task line is empty or still says `[paste your task here]`, run step 3: if PEER already posted
@@ -62,10 +57,12 @@ because of it. Without a lens, work as you normally would.
    - A wake warning means your turn was posted but notification failed or is uncertain. Do not append
      the turn again. Tell the owner if the peer has no working wait or wake route.
    - Use `--no-wake` for notes that require no peer action.
-6. Wait only when your next step needs PEER. If your wake command is registered and the peer can run it,
-   finish your current turn; the peer's next post queues your continuation. No polling or scheduled
-   checks are needed. On continuation, go to step 3.
-   Otherwise: `DUO wait --file DIALOGUE.md --as ME --timeout 3600`.
+   - `"wake": null` means PEER was not notified. That is normal when PEER is Claude Code, which waits in
+     the background. If PEER is Codex, it has no wake command yet; tell the owner that PEER needs a
+     nudge in its window.
+6. Wait only when your next step needs PEER. On Codex, just finish your current turn: PEER's next post
+   starts your next one. No polling or scheduled checks are needed. Then go to step 3.
+   Elsewhere: `DUO wait --file DIALOGUE.md --as ME --timeout 3600`.
    If your host can run it in the background and resume you when it ends (Claude Code can), do that.
    Otherwise run it in the foreground with a timeout your host allows (for example `--timeout 50`) and
    repeat, checking for owner messages between runs; each timeout returns to you and costs a model step.

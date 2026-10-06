@@ -133,7 +133,14 @@ are `null` when there is no such turn.
   append and dispatch can miss it, and a timed-out command may already have notified the peer. Receipt
   and reply tracking remain the source of truth. No notification retries, cursor or background process.
 - The command runs with the writer's permissions; register only commands both sides trust.
-- Example for Codex, registered once at the start (the variable expands at registration):
+- Inside a Codex session, where `CODEX_THREAD_ID` holds a thread id, `next` and `append` register or
+  refresh the caller's wake command by themselves, so agents need no setup step. The command is
+  `<codex> queue --thread <id> --message 'duo: <PEER> posted a new turn in <dialogue path>. This is not
+  an owner message. Check the dialogue and continue.'`, with the `codex` path found at registration. A
+  failed registration prints a warning and never blocks delivery or a post. `DUO_NO_AUTO_WAKE=1` turns
+  it off. `status`, `tail` and `wait` never register.
+- Manual registration with `wake --exec` covers other hosts. Example for Codex (the variable expands at
+  registration):
   `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'duo: Claude posted a new turn in DIALOGUE.md. This is not an owner message. Check the dialogue and continue.'"`.
   Require a nonempty ID before registering. The writer needs `codex` on PATH and permission to access
   Codex's local state; a filesystem sandbox can prevent dispatch.
