@@ -12,11 +12,10 @@ to answer, and wakes the other agent when a new message arrives.
 1. Copy `duo.py` into your project root.
 2. Open Claude Code and Codex in the project root, or start both at once with the
    [tmux shortcut](#both-sessions-in-one-terminal) below.
-3. Paste the whole of [`START_PROMPT.md`](START_PROMPT.md) into each session, unchanged.
-4. In **one** of the two, add your task right under the pasted prompt before sending, for example:
+3. Copy [`START_PROMPT.md`](START_PROMPT.md) and put your task on its second line, for example
    `Task: add a Grafana dashboard for API latency, with tests.`
-   The other session gets the prompt alone and picks the task up from the dialogue. You can also give
-   the task later, to either session.
+4. Paste the whole prompt into both sessions. If you leave the `Task:` line as it is, the agents ask
+   you for the task.
 
 They agree on a plan, split the work by what each does best and review each other's parts. Watch
 `DIALOGUE.md`; the agents tell you when a decision is yours and when the work is done.

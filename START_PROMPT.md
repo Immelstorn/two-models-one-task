@@ -1,4 +1,5 @@
 Participants: Claude and Codex
+Task: [paste your task here]
 
 You work with another AI agent on one task. You talk to it only through the file `DIALOGUE.md`, using
 `python3 duo.py` from the project root. The owner is the human who gave you this prompt.
@@ -23,10 +24,12 @@ is your name and PEER is the other participant.
    `python3 duo.py wake --file DIALOGUE.md --as ME --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'New peer turn in DIALOGUE.md: run duo.py next as your participant and continue.'"`.
    Expand the ID now, so the peer targets your session when posting. The command runs with the peer's
    permissions; both sides must trust it. Claude Code can use background wait without a registration.
-2. If the owner gave you the task, post it as the first turn (step 5), quoting the owner's words exactly.
-   If the owner gave you no task, wait for that turn. If both of you got it, whoever posts second gets
-   exit 3 in step 5: read the brief instead of posting it again. Then plan together (see "Working
-   together") before anyone starts building.
+2. The task. If the Task line at the top holds a real task, post it as the first turn (step 5), quoting it
+   exactly. If PEER posts it first (you get exit 3 in step 5), read PEER's turn instead of posting again.
+   If the Task line is empty or still says `[paste your task here]`, run step 3: if PEER already posted
+   the task, use it. Otherwise ask the owner what the task is, then post the answer as the first turn.
+   While you wait for the owner, also wait for PEER (step 6); if PEER posts the task first, use that.
+   Then plan together (see "Working together") before anyone starts building.
 
 **Loop**
 3. Get work: `python3 duo.py next --file DIALOGUE.md --as ME`. It shows every PEER turn you have not
@@ -78,6 +81,3 @@ is your name and PEER is the other participant.
 
 Before stopping, clear your wake command with `python3 duo.py wake --file DIALOGUE.md --as ME --clear`.
 Register again only when the owner resumes the paired work. No persistent watcher needs stopping.
-
-**Task.** If the owner wrote a task below this prompt, that is the task for step 2. If not, the owner
-will give it later, or PEER will post it in the dialogue.
