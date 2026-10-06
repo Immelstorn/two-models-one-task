@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Copyright (c) 2026 Denys Volovenko. MIT License.
+# https://github.com/Immelstorn/two-models-one-task
+#
+# duo: open two AI coding agents side by side in tmux, in the current folder, and start the duo
+# skill in both with the same task.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: duo [-l AGENT[:LENS]] [-r AGENT[:LENS]] [-d] [TASK...]
+
+  -l   left agent  (default: claude)
+  -r   right agent (default: codex)
+  -d   start detached; attach later with: tmux attach -t duo-<folder>
+
+AGENT is claude, codex, or a Claude model such as opus, sonnet or haiku.
+LENS is an optional way of thinking, in plain words, for example builder, skeptic or security.
+Two identical agents get the lenses builder and skeptic unless you set lenses yourself.
+
+examples:
+  duo "add a latency dashboard, with tests"
+  duo -l opus -r sonnet "refactor the parser"
+  duo -l opus -r opus "find the memory leak"
+  duo -l opus:security -r codex "review the login flow"
+EOF
+}
+
+left=claude right=codex detached=
+while getopts ":l:r:dh" option; do
+  case $option in
+    l) left=$OPTARG ;;
+    r) right=$OPTARG ;;
+    d) detached=1 ;;
+    h) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+done
+shift $((OPTIND - 1))
+task="$*"
+
+agent_of() { printf '%s' "${1%%:*}"; }
+lens_of() { case $1 in *:*) printf '%s' "${1#*:}" ;; esac; }
+name_of() {
+  case $1 in
+    claude) printf 'Claude' ;;
+    codex) printf 'Codex' ;;
+    *) printf '%s%s' "$(printf '%s' "${1:0:1}" | tr '[:lower:]' '[:upper:]')" "${1:1}" ;;
+  esac
+}
+
+left_agent=$(agent_of "$left") right_agent=$(agent_of "$right")
+left_lens=$(lens_of "$left") right_lens=$(lens_of "$right")
+left_name=$(name_of "$left_agent") right_name=$(name_of "$right_agent")
+if [ "$left_name" = "$right_name" ]; then
+  left_name="${left_name}1" right_name="${right_name}2"
+fi
+if [ "$left_agent" = "$right_agent" ] && [ -z "$left_lens" ] && [ -z "$right_lens" ]; then
+  left_lens=builder right_lens=skeptic
+fi
+
+# Sets the array `command` for one pane: the agent program, its model and the skill invocation.
+# tmux runs it directly, without a shell, so the task text is passed as data.
+build() {
+  local agent=$1 me=$2 lens=$3 text
+  text="participants: $left_name and $right_name; you are $me"
+  if [ -n "$lens" ]; then text="$text; lens: $lens"; fi
+  text="$text."
+  if [ -n "$task" ]; then text="$text Task: $task"; fi
+  case $agent in
+    codex) command=(codex "\$duo $text") ;;
+    claude) command=(claude "/duo $text") ;;
+    *) command=(claude --model "$agent" "/duo $text") ;;
+  esac
+}
+
+session="duo-$(basename "$PWD" | tr '.:' '__')"
+if tmux has-session -t "=$session" 2>/dev/null; then
+  echo "duo: tmux session $session already exists; attach with: tmux attach -t $session" >&2
+  exit 1
+fi
+
+build "$left_agent" "$left_name" "$left_lens"
+tmux new-session -d -s "$session" -c "$PWD" "${command[@]}"
+build "$right_agent" "$right_name" "$right_lens"
+tmux split-window -h -t "$session" -c "$PWD" "${command[@]}"
+
+if [ -n "$detached" ]; then
+  echo "duo: started $session ($left_name left, $right_name right)"
+elif [ -n "${TMUX:-}" ]; then
+  exec tmux switch-client -t "$session"
+else
+  exec tmux attach -t "$session"
+fi
