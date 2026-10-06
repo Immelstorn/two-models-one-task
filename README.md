@@ -10,13 +10,38 @@ to answer, and wakes the other agent when a new message arrives.
 ## Quick start
 
 1. Copy `duo.py` into your project root.
-2. Open Claude Code and Codex in the project root. Paste the whole of [`START_PROMPT.md`](START_PROMPT.md)
-   into each, unchanged. There is nothing to fill in.
-3. Tell either of them the task. They agree on a plan, split the work and review each other's parts.
+2. Open Claude Code and Codex in the project root, or start both at once with the
+   [tmux shortcut](#both-sessions-in-one-terminal) below.
+3. Paste the whole of [`START_PROMPT.md`](START_PROMPT.md) into each session, unchanged.
+4. In **one** of the two, add your task right under the pasted prompt before sending, for example:
+   `Task: add a Grafana dashboard for API latency, with tests.`
+   The other session gets the prompt alone and picks the task up from the dialogue. You can also give
+   the task later, to either session.
 
-Then watch `DIALOGUE.md`. The agents tell you when a decision is yours and when the work is done.
+They agree on a plan, split the work by what each does best and review each other's parts. Watch
+`DIALOGUE.md`; the agents tell you when a decision is yours and when the work is done.
 
 Using other models? Edit the first line of `START_PROMPT.md` (`Participants: Claude and Codex`) once.
+
+### Both sessions in one terminal
+
+Run this in the project folder. It opens a tmux session with Claude Code on the left and Codex on the
+right, both in that folder:
+
+```bash
+tmux new-session -s "duo-${PWD##*/}" -c "$PWD" \; send-keys 'claude' C-m \; split-window -h -c "$PWD" \; send-keys 'codex' C-m
+```
+
+To make it a `duo` command, add this line to `~/.zshrc` or `~/.bashrc`:
+
+```bash
+duo() { tmux new-session -s "duo-${PWD##*/}" -c "$PWD" \; send-keys 'claude' C-m \; split-window -h -c "$PWD" \; send-keys 'codex' C-m; }
+```
+
+- `Ctrl-b` then arrow keys moves between the panes. `Ctrl-b d` detaches; `tmux attach -t duo-<folder>`
+  comes back. tmux turns dots in the folder name into `_`.
+- Run it from a plain terminal, not from inside tmux.
+- For top and bottom panes instead of side by side, change `-h` to `-v`.
 
 ## What you need
 

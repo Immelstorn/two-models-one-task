@@ -78,3 +78,6 @@ is your name and PEER is the other participant.
 
 Before stopping, clear your wake command with `python3 duo.py wake --file DIALOGUE.md --as ME --clear`.
 Register again only when the owner resumes the paired work. No persistent watcher needs stopping.
+
+**Task.** If the owner wrote a task below this prompt, that is the task for step 2. If not, the owner
+will give it later, or PEER will post it in the dialogue.
