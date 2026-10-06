@@ -75,8 +75,8 @@ A lens changes how an agent thinks, not what it may work on. Run `duo -h` for al
 
 - macOS or Linux with Python 3.9+. No packages needed; tmux for the launcher.
 - Claude Code and Codex installed and signed in. Both stay open while they work.
-- Add `DIALOGUE.md.lock` and `DIALOGUE.md.state.json` to your `.gitignore`. The skill copies `duo.py`
-  into the project; commit it or ignore it.
+- Add `DIALOGUE.md.lock` and `DIALOGUE.md.state.json` to your `.gitignore`. The helper itself stays in
+  `~/.local/share/duo`; nothing is copied into your projects.
 - The first time an agent works in a folder, it may ask you to trust it or approve a command. Answer in
   that agent's window.
 

@@ -134,7 +134,7 @@ are `null` when there is no such turn.
   and reply tracking remain the source of truth. No notification retries, cursor or background process.
 - The command runs with the writer's permissions; register only commands both sides trust.
 - Example for Codex, registered once at the start (the variable expands at registration):
-  `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'duo: Claude posted a new turn in DIALOGUE.md. This is not an owner message. Run duo.py next as Codex and continue.'"`.
+  `python3 duo.py wake --file DIALOGUE.md --as Codex --exec "codex queue --thread \"$CODEX_THREAD_ID\" --message 'duo: Claude posted a new turn in DIALOGUE.md. This is not an owner message. Check the dialogue and continue.'"`.
   Require a nonempty ID before registering. The writer needs `codex` on PATH and permission to access
   Codex's local state; a filesystem sandbox can prevent dispatch.
 - A Claude Code participant can register nothing and keep a background `wait`, which makes no model

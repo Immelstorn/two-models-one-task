@@ -12,5 +12,5 @@ Read `START_PROMPT.md`, which sits next to this file, and follow it exactly.
   use those the same way.
 - The rest of that text is the task, usually after `Task:`. Use it as the prompt's Task line. If there is
   no task, treat the Task line as empty.
-- `duo.py` also sits next to this file. If the project root has no `duo.py`, copy it there before step 1,
-  so both agents run the same commands.
+- The helper is the `duo.py` next to this file. Run it from there with its full path (that is the
+  prompt's `DUO`); never copy it into the project.
