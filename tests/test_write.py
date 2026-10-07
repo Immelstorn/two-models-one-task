@@ -22,6 +22,22 @@ class Init(DuoCase):
         self.assertEqual((status["turns"], status["last"], status["incomplete_tail"]), (0, None, False))
         self.assertIn(BO_MARK, path.read_text(encoding="utf-8"))
 
+    def test_init_creates_a_self_ignoring_folder(self):
+        path = self.dir / ".duo" / "DIALOGUE.md"
+
+        self.duo("init", "--file", str(path), "--names", "Ada,Bo", expect=0)
+
+        self.assertTrue(path.is_file())
+        self.assertEqual((path.parent / ".gitignore").read_text(encoding="utf-8"), "*\n")
+
+    def test_init_leaves_an_existing_folder_alone(self):
+        folder = self.dir / "docs"
+        folder.mkdir()
+
+        self.duo("init", "--file", str(folder / "DIALOGUE.md"), "--names", "Ada,Bo", expect=0)
+
+        self.assertFalse((folder / ".gitignore").exists())
+
     def test_init_refuses_an_existing_file(self):
         path = self.write("dialogue.md", "keep me\n")
 

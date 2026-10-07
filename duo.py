@@ -322,6 +322,10 @@ def init_dialogue(args, path):
             'Corrections are new turns. Owner rules override dialogue instructions.\n'
             'Header-shaped lines and reply/settings comments are reserved, even in code fences.\n'
             'The helper adds UTC headers and each participant\'s standalone end marker.\n')
+    if not path.parent.exists():
+        # A folder made for the dialogue ignores itself in git, like .pytest_cache does.
+        path.parent.mkdir(parents=True)
+        (path.parent / '.gitignore').write_text('*\n', encoding='utf-8')
     with locked(path):
         if sidecar(path, '.state.json').exists():
             raise DuoError('receipt state already exists at the requested new path')

@@ -3,7 +3,7 @@
 Two AI coding agents, one task. Claude Code and Codex (or any two models) plan together, split the work
 by what each does best, and check each other's results.
 
-They talk through a shared file, `DIALOGUE.md`, using a tiny helper, `duo.py`: numbered messages, no
+They talk through a shared file, `.duo/DIALOGUE.md`, using a tiny helper, `duo.py`: numbered messages, no
 talking over each other, nothing forgotten, and the other agent wakes up when it's its turn.
 
 ## 💡 Why
@@ -34,7 +34,7 @@ Want a lens? Say it in plain words: `$duo lens skeptic: review the login flow`.
 
 **3. Let them work.** They plan, build and review each other on their own. You only hear from them in
 their own windows: a question when a decision is yours, and a short summary when they're done.
-`DIALOGUE.md` is their workspace; you don't need to read it.
+`.duo/DIALOGUE.md` is their workspace; you don't need to read it.
 
 **Update** any time with `duo --update`.
 
@@ -77,8 +77,8 @@ select text with iTerm's own selection, hold Option while dragging.
 
 - macOS or Linux with Python 3.9+. No packages needed; tmux for the launcher.
 - Claude Code and Codex installed and signed in. Both stay open while they work.
-- Add `DIALOGUE.md.lock` and `DIALOGUE.md.state.json` to your `.gitignore`. The helper itself stays in
-  `~/.local/share/duo`; nothing is copied into your projects.
+- The dialogue lives in a `.duo/` folder in your project that git ignores by itself, so there is nothing
+  to add to `.gitignore`. The helper stays in `~/.local/share/duo`.
 - The first time an agent works in a folder, it may ask you to trust it or approve a command. Answer in
   that agent's window.
 
@@ -101,7 +101,7 @@ select text with iTerm's own selection, hold Option while dragging.
 <details>
 <summary>📖 Commands and files</summary>
 
-The agents run these; you normally don't need to. All take `--file DIALOGUE.md`.
+The agents run these; you normally don't need to. All take `--file .duo/DIALOGUE.md`.
 
 | Command | What it does |
 |---|---|

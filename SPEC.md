@@ -68,7 +68,7 @@ All commands take `--file PATH`, optional `--settings PATH`, and `--json` for on
 
 | Command | Effect |
 |---|---|
-| `init --names A,B [--markers X,Y]` | Create a new `markdown` dialogue with a short rules preamble and the embedded settings block. Default markers `A_DONE_WAITING_FOR_B`, upper case. Refuses an existing path. |
+| `init --names A,B [--markers X,Y]` | Create a new `markdown` dialogue with a short rules preamble and the embedded settings block. Default markers `A_DONE_WAITING_FOR_B`, upper case. Refuses an existing path. A missing folder is created with a `.gitignore` containing `*`, so git ignores it. |
 | `status` | Read-only summary. |
 | `tail --turns K` | Read-only; the last K turns with text. |
 | `next --as NAME` | Deliver every unresolved completed peer turn, in file order, and record a receipt for each. |
