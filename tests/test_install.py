@@ -37,7 +37,8 @@ class Install(unittest.TestCase):
             self.assertEqual(link.resolve(), (self.installed / "skill").resolve())
         self.assertEqual((self.home / ".local/bin/duo").resolve(), (self.installed / "bin/duo").resolve())
         self.assertEqual(sorted(p.name for p in self.installed.parent.iterdir()), ["duo"])
-        self.assertIn("export PATH=", second.stdout)
+        self.assertIn("export PATH=", second.stderr)
+        self.assertIn("Already up to date", second.stdout)
 
     def test_a_real_folder_in_the_way_is_left_alone(self):
         mine = self.home / ".claude/skills/duo"

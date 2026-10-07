@@ -11,36 +11,57 @@
 set -euo pipefail
 
 archive=https://github.com/Immelstorn/two-models-one-task/archive/refs/heads/main.tar.gz
+install_line="curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash"
 home_dir=${DUO_HOME:-$HOME/.local/share/duo}
 bin_dir=${DUO_BIN:-$HOME/.local/bin}
 files="duo.py START_PROMPT.md skill bin install.sh LICENSE"
 skill_links="$HOME/.claude/skills/duo $HOME/.agents/skills/duo"
 
+# Colours only in a real terminal, and never when NO_COLOR is set.
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  bold=$'\033[1m' green=$'\033[32m' yellow=$'\033[33m' red=$'\033[31m' dim=$'\033[2m' reset=$'\033[0m'
+else
+  bold='' green='' yellow='' red='' dim='' reset=''
+fi
+title() { printf '%s%s%s\n' "$bold" "$*" "$reset"; }
+done_step() { printf '  %s✓%s %s\n' "$green" "$reset" "$*"; }
+warn() { printf '  %s!%s %s\n' "$yellow" "$reset" "$*" >&2; }
+fail() { printf '%s✗ %s%s\n' "$red" "$*" "$reset" >&2; exit 1; }
+short() { case $1 in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+fingerprint() { if [ -d "$1" ]; then (cd "$1" && find . -type f | LC_ALL=C sort | xargs cksum | cksum); fi; }
+
 if [ "${1:-}" = --uninstall ]; then
+  title "🧹 Removing duo..."
   for link in $skill_links "$bin_dir/duo"; do
     if [ -L "$link" ]; then rm "$link"; fi
   done
+  done_step "Skill removed from Claude Code and Codex"
   if [ -f "$home_dir/duo.py" ]; then rm -rf "$home_dir"; fi
-  echo "duo: removed"
+  done_step "Removed $(short "$home_dir") and the duo command"
+  echo
+  title "👋 duo is gone. Come back any time:"
+  printf '   %s%s%s\n' "$dim" "$install_line" "$reset"
   exit 0
 fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+before=$(fingerprint "$home_dir")
+if [ -n "$before" ]; then title "🔄 Updating duo..."; else title "🤝 Installing duo..."; fi
+
 if [ "${1:-}" = --from ]; then
-  source_dir=$(cd "${2:?duo: --from needs a folder}" && pwd)
+  source_dir=$(cd "${2:?--from needs a folder}" && pwd)
+  done_step "Using the copy in $(short "$source_dir")"
 else
-  echo "duo: downloading the latest version"
   source_dir=$work/source
   mkdir "$source_dir"
-  curl -fsSL "$archive" | tar -xz --strip-components=1 -C "$source_dir"
+  curl -fsSL "$archive" | tar -xz --strip-components=1 -C "$source_dir" \
+    || fail "Download failed; check your connection. Nothing changed."
+  done_step "Downloaded the latest version"
 fi
 for file in $files; do
-  if [ ! -e "$source_dir/$file" ]; then
-    echo "duo: $source_dir has no $file; nothing changed" >&2
-    exit 1
-  fi
+  [ -e "$source_dir/$file" ] || fail "$(short "$source_dir") has no $file; nothing changed."
 done
 
 # Build the new copy beside the old one, then swap, so a failed run never leaves half an install.
@@ -49,22 +70,34 @@ fresh=$(mktemp -d "$home_dir.new.XXXXXX")
 (cd "$source_dir" && tar -cf - $files) | (cd "$fresh" && tar -xf -)
 if [ -e "$home_dir" ]; then mv "$home_dir" "$work/previous"; fi
 mv "$fresh" "$home_dir"
-echo "duo: installed in $home_dir"
+done_step "Installed in $(short "$home_dir")"
 
 for link in $skill_links; do
   mkdir -p "$(dirname "$link")"
   if [ -e "$link" ] && [ ! -L "$link" ]; then
-    echo "duo: $link exists and is not a link; left alone" >&2
+    warn "$(short "$link") is a real folder, not a link, so it was left alone"
     continue
   fi
   ln -sfn "$home_dir/skill" "$link"
-  echo "duo: skill linked at $link"
 done
+done_step "Skill ready: /duo in Claude Code, \$duo in Codex"
 
 mkdir -p "$bin_dir"
 ln -sfn "$home_dir/bin/duo" "$bin_dir/duo"
 case ":$PATH:" in
-  *":$bin_dir:"*) echo "duo: done; try duo -h" ;;
-  *) echo "duo: done. For the terminal launcher, add this line to ~/.zshrc or ~/.bashrc:"
-     echo "  export PATH=\"$bin_dir:\$PATH\"" ;;
+  *":$bin_dir:"*) done_step "duo command ready" ;;
+  *) case $bin_dir in "$HOME"/*) shown='$HOME'${bin_dir#"$HOME"} ;; *) shown=$bin_dir ;; esac
+     case ${SHELL:-} in */bash) profile='~/.bashrc' ;; *) profile='~/.zshrc' ;; esac
+     warn "To use the duo command in a terminal, add $(short "$bin_dir") to your PATH:"
+     printf '      %secho %s >> %s%s\n' "$dim" "'export PATH=\"$shown:\$PATH\"'" "$profile" "$reset" >&2 ;;
 esac
+
+echo
+after=$(fingerprint "$home_dir")
+if [ -z "$before" ]; then
+  title "🎉 All set! Try /duo in Claude Code or \$duo in Codex."
+elif [ "$before" = "$after" ]; then
+  title "✨ Already up to date."
+else
+  title "✨ duo is updated. New sessions use the new version."
+fi
