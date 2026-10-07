@@ -54,38 +54,46 @@ class Launcher(unittest.TestCase):
 
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(self.args_of("claude"),
-                         [['/duo participants: Claude and Codex; you are Claude. Task: fix "quotes"; and $HOME']])
+                         [['--settings', '{"tui":"default"}', '/duo participants: Claude and Codex; you are Claude. Task: fix "quotes"; and $HOME']])
         self.assertEqual(self.args_of("codex"),
-                         [['$duo participants: Claude and Codex; you are Codex. Task: fix "quotes"; and $HOME']])
+                         [['--no-alt-screen', '$duo participants: Claude and Codex; you are Codex. Task: fix "quotes"; and $HOME']])
         self.assertIn("duo-my_project", done.stdout)
 
     def test_same_model_twice_gets_numbered_names_and_two_lenses(self):
         self.launch("-l", "opus", "-r", "opus", "find the leak")
 
         self.assertEqual(self.args_of("claude", panes=2), [
-            ["--model", "opus", "/duo participants: Opus1 and Opus2; you are Opus1; lens: builder. Task: find the leak"],
-            ["--model", "opus", "/duo participants: Opus1 and Opus2; you are Opus2; lens: skeptic. Task: find the leak"]])
+            ["--settings", '{"tui":"default"}', "--model", "opus", "/duo participants: Opus1 and Opus2; you are Opus1; lens: builder. Task: find the leak"],
+            ["--settings", '{"tui":"default"}', "--model", "opus", "/duo participants: Opus1 and Opus2; you are Opus2; lens: skeptic. Task: find the leak"]])
 
     def test_explicit_lens_and_no_task(self):
         self.launch("-l", "opus:security", "-r", "codex")
 
         self.assertEqual(self.args_of("claude"),
-                         [["--model", "opus", "/duo participants: Opus and Codex; you are Opus; lens: security."]])
-        self.assertEqual(self.args_of("codex"), [["$duo participants: Opus and Codex; you are Codex."]])
+                         [["--settings", '{"tui":"default"}', "--model", "opus", "/duo participants: Opus and Codex; you are Opus; lens: security."]])
+        self.assertEqual(self.args_of("codex"), [["--no-alt-screen", "$duo participants: Opus and Codex; you are Codex."]])
 
     def test_two_codex_models(self):
         self.launch("-l", "codex/model-a", "-r", "codex/model-b", "compare")
 
         self.assertEqual(self.args_of("codex", panes=2), [
-            ["--model", "model-a", "$duo participants: Codex1 and Codex2; you are Codex1. Task: compare"],
-            ["--model", "model-b", "$duo participants: Codex1 and Codex2; you are Codex2. Task: compare"]])
+            ["--no-alt-screen", "--model", "model-a", "$duo participants: Codex1 and Codex2; you are Codex1. Task: compare"],
+            ["--no-alt-screen", "--model", "model-b", "$duo participants: Codex1 and Codex2; you are Codex2. Task: compare"]])
 
     def test_same_codex_twice_gets_two_lenses(self):
         self.launch("-l", "codex", "-r", "codex", "compare")
 
         self.assertEqual(self.args_of("codex", panes=2), [
-            ["$duo participants: Codex1 and Codex2; you are Codex1; lens: builder. Task: compare"],
-            ["$duo participants: Codex1 and Codex2; you are Codex2; lens: skeptic. Task: compare"]])
+            ["--no-alt-screen", "$duo participants: Codex1 and Codex2; you are Codex1; lens: builder. Task: compare"],
+            ["--no-alt-screen", "$duo participants: Codex1 and Codex2; you are Codex2; lens: skeptic. Task: compare"]])
+
+    def test_mouse_is_on_for_the_duo_session(self):
+        self.launch("task")
+
+        mouse = subprocess.run(["tmux", "show-options", "-t", "duo-my_project", "-v", "mouse"], env=self.env,
+                               capture_output=True, text=True).stdout.strip()
+
+        self.assertEqual(mouse, "on")
 
     def test_a_running_session_is_not_replaced(self):
         self.launch("first")

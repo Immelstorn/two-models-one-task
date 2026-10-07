@@ -99,7 +99,8 @@ build() {
   if [ -n "$task" ]; then text="$text Task: $task"; fi
   local program model
   program=$(program_of "$agent") model=$(model_of "$agent")
-  command=("$program")
+  # Inline mode, not full screen: tmux then owns the mouse, so the wheel scrolls and clicks pick panes.
+  if [ "$program" = codex ]; then command=(codex --no-alt-screen); else command=(claude --settings '{"tui":"default"}'); fi
   if [ -n "$model" ]; then command+=(--model "$model"); fi
   if [ "$program" = codex ]; then command+=("\$duo $text"); else command+=("/duo $text"); fi
 }
@@ -114,6 +115,7 @@ build "$left_agent" "$left_name" "$left_lens"
 tmux new-session -d -s "$session" -c "$PWD" "${command[@]}"
 build "$right_agent" "$right_name" "$right_lens"
 tmux split-window -h -t "$session" -c "$PWD" "${command[@]}"
+tmux set-option -t "$session" mouse on >/dev/null
 
 if [ -n "$detached" ]; then
   echo "duo: started $session ($left_name left, $right_name right)"

@@ -62,7 +62,9 @@ duo -l codex -r codex/MODEL "task"      # two Codex models
 
 A lens changes how an agent thinks, not what it may work on. Run `duo -h` for all options.
 
-**In tmux:** `Ctrl-b` and an arrow key switches panes, `Ctrl-b d` detaches, `tmux attach -t duo-<folder>` returns.
+**In tmux:** click a pane to switch to it and scroll with the mouse wheel; both agents run in their inline
+view there, so tmux handles the mouse. `Ctrl-b d` detaches, `tmux attach -t duo-<folder>` returns. To
+select text with iTerm's own selection, hold Option while dragging.
 
 ## 📋 No install? Paste instead
 
