@@ -31,23 +31,19 @@ examples:
 EOF
 }
 
-update() {
-  curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash
-}
-
-# Runs the installed copy of install.sh, found next to the real location of this script.
-uninstall() {
+# The installed copy of install.sh, next to the real location of this script.
+installer() {
   local self=${BASH_SOURCE[0]} target
   while [ -L "$self" ]; do
     target=$(readlink "$self")
     case $target in /*) self=$target ;; *) self=$(dirname "$self")/$target ;; esac
   done
-  exec bash "$(cd "$(dirname "$self")/.." && pwd)/install.sh" --uninstall
+  printf '%s/install.sh' "$(cd "$(dirname "$self")/.." && pwd)"
 }
 
 case ${1:-} in
-  --update) update; exit ;;
-  --uninstall) uninstall ;;
+  --update) exec bash "$(installer)" ;;
+  --uninstall) exec bash "$(installer)" --uninstall ;;
   --help) usage; exit 0 ;;
 esac
 
@@ -57,7 +53,7 @@ while getopts ":l:r:duh" option; do
     l) left=$OPTARG ;;
     r) right=$OPTARG ;;
     d) detached=1 ;;
-    u) update; exit ;;
+    u) exec bash "$(installer)" ;;
     h) usage; exit 0 ;;
     *) usage >&2; exit 2 ;;
   esac

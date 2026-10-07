@@ -22,6 +22,19 @@ class Install(unittest.TestCase):
         self.env["HOME"] = str(self.home)
         self.installed = self.home / ".local/share/duo"
 
+    def archive(self) -> str:
+        """A local release archive whose installer prints a marker, as a file:// address."""
+        top = self.base / "release" / "duo-main"
+        top.mkdir(parents=True)
+        subprocess.run(f"tar -cf - duo.py START_PROMPT.md skill bin install.sh LICENSE | tar -xf - -C '{top}'",
+                       shell=True, cwd=ROOT, check=True)
+        installer = top / "install.sh"
+        lines = installer.read_text(encoding="utf-8").splitlines(keepends=True)
+        installer.write_text(lines[0] + "echo newest-installer-ran\n" + "".join(lines[1:]), encoding="utf-8")
+        tarball = self.base / "main.tar.gz"
+        subprocess.run(["tar", "-czf", str(tarball), "-C", str(top.parent), "duo-main"], check=True)
+        return f"file://{tarball}"
+
     def install(self, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(["bash", str(ROOT / "install.sh"), *args], env=self.env,
                               capture_output=True, text=True, timeout=60)
@@ -87,6 +100,27 @@ class Install(unittest.TestCase):
         self.assertIn("removed", done.stdout)
         self.assertFalse(self.installed.exists())
         self.assertFalse((self.home / ".local/bin/duo").is_symlink())
+
+    def test_download_hands_over_to_the_newest_installer(self):
+        self.env["DUO_ARCHIVE"] = self.archive()
+
+        done = self.install()
+
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("newest-installer-ran", done.stdout)
+        self.assertIn("Downloaded the latest version", done.stdout)
+        self.assertTrue((self.installed / "duo.py").is_file())
+
+    def test_duo_update_downloads_with_the_installed_copy(self):
+        self.install("--from", str(ROOT))
+        self.env["DUO_ARCHIVE"] = self.archive()
+
+        done = subprocess.run([str(self.home / ".local/bin/duo"), "-u"], env=self.env,
+                              capture_output=True, text=True, timeout=60)
+
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("Updating duo", done.stdout)
+        self.assertIn("newest-installer-ran", done.stdout)
 
 
 if __name__ == "__main__":

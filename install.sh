@@ -10,7 +10,7 @@
 #   install.sh --uninstall   remove what this script installed
 set -euo pipefail
 
-archive=https://github.com/Immelstorn/two-models-one-task/archive/refs/heads/main.tar.gz
+archive=${DUO_ARCHIVE:-https://github.com/Immelstorn/two-models-one-task/archive/refs/heads/main.tar.gz}
 install_line="curl -fsSL https://raw.githubusercontent.com/Immelstorn/two-models-one-task/main/install.sh | bash"
 home_dir=${DUO_HOME:-$HOME/.local/share/duo}
 bin_dir=${DUO_BIN:-$HOME/.local/bin}
@@ -47,18 +47,25 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Without --from: download the latest version, then let its own installer do the rest. That way the
+# newest installer always runs, even when this copy came from a cache that is a few minutes old.
+if [ "${1:-}" != --from ]; then
+  mkdir "$work/source"
+  curl -fsSL "$archive" | tar -xz --strip-components=1 -C "$work/source" \
+    || fail "Download failed; check your connection. Nothing changed."
+  [ -f "$work/source/install.sh" ] || fail "The download has no installer; nothing changed."
+  bash "$work/source/install.sh" --from "$work/source" --downloaded
+  exit
+fi
+
 before=$(fingerprint "$home_dir")
 if [ -n "$before" ]; then title "🔄 Updating duo..."; else title "🤝 Installing duo..."; fi
 
-if [ "${1:-}" = --from ]; then
-  source_dir=$(cd "${2:?--from needs a folder}" && pwd)
-  done_step "Using the copy in $(short "$source_dir")"
-else
-  source_dir=$work/source
-  mkdir "$source_dir"
-  curl -fsSL "$archive" | tar -xz --strip-components=1 -C "$source_dir" \
-    || fail "Download failed; check your connection. Nothing changed."
+source_dir=$(cd "${2:?--from needs a folder}" && pwd)
+if [ "${3:-}" = --downloaded ]; then
   done_step "Downloaded the latest version"
+else
+  done_step "Using the copy in $(short "$source_dir")"
 fi
 for file in $files; do
   [ -e "$source_dir/$file" ] || fail "$(short "$source_dir") has no $file; nothing changed."
