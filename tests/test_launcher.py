@@ -34,7 +34,9 @@ class Launcher(unittest.TestCase):
             fake.write_text(FAKE, encoding="utf-8")
             fake.chmod(0o755)
         self.env = {k: v for k, v in os.environ.items() if k != "TMUX"}
-        self.env.update(PATH=f"{fakes}:{os.environ['PATH']}", TMUX_TMPDIR=str(base))
+        self.codex_home = base / "codex-home"
+        self.codex_home.mkdir()
+        self.env.update(PATH=f"{fakes}:{os.environ['PATH']}", TMUX_TMPDIR=str(base), CODEX_HOME=str(self.codex_home))
         self.addCleanup(subprocess.run, ["tmux", "kill-server"], env=self.env, capture_output=True)
 
     def launch(self, *args: str) -> subprocess.CompletedProcess:
@@ -86,6 +88,24 @@ class Launcher(unittest.TestCase):
         self.assertEqual(self.args_of("codex", panes=2), [
             ["--no-alt-screen", "$duo participants: Codex1 and Codex2; you are Codex1; lens: builder. Task: compare"],
             ["--no-alt-screen", "$duo participants: Codex1 and Codex2; you are Codex2; lens: skeptic. Task: compare"]])
+
+    def test_codex_gets_the_model_and_effort_from_its_own_config(self):
+        (self.codex_home / "config.toml").write_text(
+            'model = "model-x"\nmodel_reasoning_effort = "xhigh"\n\n[profiles.other]\nmodel = "nope"\n',
+            encoding="utf-8")
+
+        self.launch("task")
+
+        self.assertEqual(self.args_of("codex"), [[
+            "--no-alt-screen", "--model", "model-x", "-c", "model_reasoning_effort=xhigh",
+            "$duo participants: Claude and Codex; you are Codex. Task: task"]])
+
+    def test_a_chosen_codex_model_wins_over_the_config(self):
+        (self.codex_home / "config.toml").write_text('model = "model-x"\n', encoding="utf-8")
+
+        self.launch("-r", "codex/model-y", "task")
+
+        self.assertEqual(self.args_of("codex")[0][:3], ["--no-alt-screen", "--model", "model-y"])
 
     def test_mouse_is_on_for_the_duo_session(self):
         self.launch("task")

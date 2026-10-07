@@ -89,6 +89,14 @@ if [ "$left_agent" = "$right_agent" ] && [ -z "$left_lens" ] && [ -z "$right_len
   left_lens=builder right_lens=skeptic
 fi
 
+# A top-level setting from Codex's own config.toml (before the first [table]), or nothing.
+codex_setting() {
+  local config="${CODEX_HOME:-$HOME/.codex}/config.toml"
+  if [ -f "$config" ]; then
+    sed -n -e '/^\[/q' -e "s/^$1[[:space:]]*=[[:space:]]*\"\(.*\)\".*/\1/p" "$config" | head -n 1
+  fi
+}
+
 # Sets the array `command` for one pane: the agent program, its model and the skill invocation.
 # tmux runs it directly, without a shell, so the task text is passed as data.
 build() {
@@ -97,12 +105,21 @@ build() {
   if [ -n "$lens" ]; then text="$text; lens: $lens"; fi
   text="$text."
   if [ -n "$task" ]; then text="$text Task: $task"; fi
-  local program model
+  local program model effort
   program=$(program_of "$agent") model=$(model_of "$agent")
   # Inline mode, not full screen: tmux then owns the mouse, so the wheel scrolls and clicks pick panes.
   if [ "$program" = codex ]; then command=(codex --no-alt-screen); else command=(claude --settings '{"tui":"default"}'); fi
+  # Codex runs a prompt given at launch on its built-in default model, so pass its configured
+  # model and effort explicitly; a model chosen with codex/MODEL still wins.
+  if [ "$program" = codex ] && [ -z "$model" ]; then model=$(codex_setting model); fi
   if [ -n "$model" ]; then command+=(--model "$model"); fi
-  if [ "$program" = codex ]; then command+=("\$duo $text"); else command+=("/duo $text"); fi
+  if [ "$program" = codex ]; then
+    effort=$(codex_setting model_reasoning_effort)
+    if [ -n "$effort" ]; then command+=(-c "model_reasoning_effort=$effort"); fi
+    command+=("\$duo $text")
+  else
+    command+=("/duo $text")
+  fi
 }
 
 session="duo-$(basename "$PWD" | tr '.:' '__')"
