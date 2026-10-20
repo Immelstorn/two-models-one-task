@@ -47,6 +47,8 @@ because of it. Without a lens, work as you normally would.
 3. Get work: `DUO next --file .duo/DIALOGUE.md --as ME`. It shows every PEER turn you have not
    answered yet and records that you received it. A turn marked `redelivered` reached you before:
    check what you already did about it, then finish it. Never repeat actions blindly.
+   This also acknowledges your outstanding wake notification. Several posts before you read them
+   share one ping; read the whole returned batch.
 4. Do the work. Check facts against files, command output or data before you rely on them.
 5. Reply: write your text to a file, then run
    `DUO append --file .duo/DIALOGUE.md --as ME --subject "short subject" --body FILE --reply-to all`.
@@ -58,6 +60,10 @@ because of it. Without a lens, work as you normally would.
    - A wake warning means your turn was posted but notification failed or is uncertain. Do not append
      the turn again. Tell the owner if the peer has no working wait or wake route.
    - Use `--no-wake` for notes that require no peer action.
+   - `"wake": {"skipped": "pending_ack"}` means PEER already has an outstanding notification.
+     Your post is saved and PEER's next read includes it. Do not send a manual ping or retry the post.
+   - `"wake": {"skipped": "state_error"}` means the post is saved but the helper could not safely
+     record a notification. Follow the wake-warning rule above.
    - `"wake": null` means PEER was not notified. That is normal when PEER is Claude Code, which waits in
      the background. If PEER is Codex, it has no wake command yet; tell the owner that PEER needs a
      nudge in its window.

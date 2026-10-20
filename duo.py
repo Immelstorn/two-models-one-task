@@ -228,6 +228,13 @@ def validate_state(state, data, turns, settings):
         raise DuoError('invalid wake registrations in state')
     for command in wake.values():
         validate_wake_command(command)
+    wake_pending = state.get('wake_pending', {})
+    if not isinstance(wake_pending, dict):
+        raise DuoError('invalid pending wakes in state')
+    for name, key in wake_pending.items():
+        if (name not in wake or not isinstance(key, str) or key not in by_key
+                or by_key[key]['author'] == name):
+            raise DuoError('invalid pending wake; reconcile state explicitly')
     seen = set()
     for receipt in state['receipts']:
         if not isinstance(receipt, dict) or set(receipt) != {'by', 'key', 'time'}:
@@ -347,8 +354,9 @@ def deliver(args, path):
         data, settings, turns, state, received, pending = snapshot(path, args.settings)
         require_person(args.person, settings)
         registered = refresh_wake(state, path, settings, args.person)
+        acknowledged = state.get('wake_pending', {}).pop(args.person, None) is not None
         work = pending[args.person]
-        if not work:
+        if not work and not acknowledged:
             if registered:
                 save_registration(path, state, data)
             return {'turns': []}, 2
@@ -364,7 +372,7 @@ def deliver(args, path):
             save_state(path, state)
         except OSError as exc:
             raise DuoError(f'receipt write interrupted: {exc}; inspect state before retrying', 5) from exc
-        return {'turns': result}, 0
+        return {'turns': result}, 0 if result else 2
 
 
 def validate_wake_command(command):
@@ -395,6 +403,7 @@ def refresh_wake(state, path, settings, person):
         return False
     validate_wake_command(command)
     state.setdefault('wake', {})[person] = command
+    state.get('wake_pending', {}).pop(person, None)
     return True
 
 
@@ -414,8 +423,11 @@ def register_wake(args, path):
         wake = state.setdefault('wake', {})
         if args.clear:
             wake.pop(args.person, None)
+            state.get('wake_pending', {}).pop(args.person, None)
         else:
             validate_wake_command(args.wake_exec)
+            if wake.get(args.person) != args.wake_exec:
+                state.get('wake_pending', {}).pop(args.person, None)
             wake[args.person] = args.wake_exec
         state['prefix'] = {'bytes': len(data), 'sha256': digest(data)}
         try:
@@ -457,7 +469,9 @@ def run_wake(command, path, author, number):
             process.wait()
     if code:
         warning = warning or f'exited {code}'
-        print(f'duo: wake {warning}; turn is committed, do not append it again', file=sys.stderr)
+        print(f'duo: wake {warning}; turn is committed, do not append it again; '
+              'notification stays pending until the peer runs next or its wake is cleared',
+              file=sys.stderr)
     return {'exit': code}
 
 
@@ -529,9 +543,28 @@ def append_turn(args, path):
         peer = next(p['name'] for p in settings['participants'] if p['name'] != args.person)
         command = None if args.no_wake else state.get('wake', {}).get(peer)
         turn = public_turn(proposed[-1])
+        wake = None
+        if command is not None:
+            if peer in state.get('wake_pending', {}):
+                command = None
+                wake = {'skipped': 'pending_ack'}
+            else:
+                # Reserve durably while holding the append lock. A second writer
+                # must see this even if dispatch is slow or crashes after queueing.
+                state.setdefault('wake_pending', {})[peer] = turn['key']
+                state['prefix'] = {'bytes': len(data + addition), 'sha256': digest(data + addition)}
+                try:
+                    save_state(path, state)
+                except OSError as exc:
+                    # Never send an untracked ping: another post could duplicate it.
+                    print(f'duo: wake reservation failed: {exc}; turn is committed, '
+                          'notification skipped, do not append it again', file=sys.stderr)
+                    command = None
+                    wake = {'skipped': 'state_error'}
     # A receiver can immediately call next, which needs the same lock.
     try:
-        wake = run_wake(command, path, args.person, number)
+        if command is not None:
+            wake = run_wake(command, path, args.person, number)
     except OSError as exc:
         raise DuoError(f'wake reporting interrupted: {exc}; turn is committed, inspect status', 5) from exc
     return {'turn': turn, 'wake': wake}, 0
@@ -563,7 +596,8 @@ def read_command(args, path):
                     'last_complete': public_turn(complete[-1]) if complete else None,
                     'incomplete_tail': bool(turns and not turns[-1]['complete']),
                     'pending': {name: [t['key'] for t in values] for name, values in pending.items()},
-                    'receipts': state['receipts'], 'wake': state.get('wake', {})}, 0
+                    'receipts': state['receipts'], 'wake': state.get('wake', {}),
+                    'wake_pending': state.get('wake_pending', {})}, 0
         if args.command == 'tail':
             selected = turns[-args.turns:] if args.turns else []
             return {'turns': [public_turn(t, True) for t in selected]}, 0
