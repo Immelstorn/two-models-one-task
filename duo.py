@@ -354,7 +354,10 @@ def deliver(args, path):
         data, settings, turns, state, received, pending = snapshot(path, args.settings)
         require_person(args.person, settings)
         registered = refresh_wake(state, path, settings, args.person)
-        acknowledged = state.get('wake_pending', {}).pop(args.person, None) is not None
+        wake_pending = state.get('wake_pending', {})
+        acknowledged = bool(args.ack_wake and wake_pending.get(args.person) == args.ack_wake)
+        if acknowledged:
+            del wake_pending[args.person]
         work = pending[args.person]
         if not work and not acknowledged:
             if registered:
@@ -396,14 +399,30 @@ def codex_wake_command(path, settings, person):
     return ' '.join(shlex.quote(part) for part in parts)
 
 
+def codex_queue_args(command):
+    """Recognize the direct queue command we register, never arbitrary shell code."""
+    try:
+        parts = shlex.split(command or '')
+    except ValueError:
+        return None
+    if (len(parts) == 6 and Path(parts[0]).name == 'codex'
+            and parts[1:3] == ['queue', '--thread'] and THREAD_ID.match(parts[3])
+            and parts[4] == '--message'):
+        return parts
+    return None
+
+
 def refresh_wake(state, path, settings, person):
     """Keep a Codex session's wake command registered and current; True when the state changed."""
     command = codex_wake_command(path, settings, person)
     if command is None or state.get('wake', {}).get(person) == command:
         return False
     validate_wake_command(command)
+    old = codex_queue_args(state.get('wake', {}).get(person))
+    new = codex_queue_args(command)
     state.setdefault('wake', {})[person] = command
-    state.get('wake_pending', {}).pop(person, None)
+    if old is None or new is None or old[3] != new[3]:
+        state.get('wake_pending', {}).pop(person, None)
     return True
 
 
@@ -437,10 +456,19 @@ def register_wake(args, path):
     return {'wake': wake}, 0
 
 
-def run_wake(command, path, author, number):
+def run_wake(command, path, author, number, token, ack_command):
     if command is None:
         return None
-    env = dict(os.environ, DUO_FILE=str(path), DUO_FROM=author, DUO_TURN=str(number))
+    env = dict(os.environ, DUO_FILE=str(path), DUO_FROM=author, DUO_TURN=str(number),
+               DUO_WAKE_TOKEN=token, DUO_WAKE_ACK=ack_command)
+    # Upgrade even previously registered direct queue commands at dispatch time.
+    # The token belongs to this queued input, not to a routine dialogue read.
+    parts = codex_queue_args(command)
+    if parts is not None:
+        parts[5] += (' When processing THIS queued notification, acknowledge it with:\n'
+                     + ack_command +
+                     '\nUse this token only for this notification, not during ordinary dialogue reads.')
+        command = shlex.join(parts)
     process = None
     warning = None
     try:
@@ -470,7 +498,7 @@ def run_wake(command, path, author, number):
     if code:
         warning = warning or f'exited {code}'
         print(f'duo: wake {warning}; turn is committed, do not append it again; '
-              'notification stays pending until the peer runs next or its wake is cleared',
+              'notification stays pending until its token is acknowledged or its wake is cleared',
               file=sys.stderr)
     return {'exit': code}
 
@@ -564,7 +592,11 @@ def append_turn(args, path):
     # A receiver can immediately call next, which needs the same lock.
     try:
         if command is not None:
-            wake = run_wake(command, path, args.person, number)
+            ack_args = [sys.executable, '-B', str(Path(__file__).resolve()), 'next',
+                        '--file', str(path), '--as', peer, '--ack-wake', turn['key']]
+            if args.settings:
+                ack_args.extend(['--settings', str(Path(args.settings).expanduser().resolve())])
+            wake = run_wake(command, path, args.person, number, turn['key'], shlex.join(ack_args))
     except OSError as exc:
         raise DuoError(f'wake reporting interrupted: {exc}; turn is committed, inspect status', 5) from exc
     return {'turn': turn, 'wake': wake}, 0
@@ -624,6 +656,9 @@ def arguments(argv):
             command.add_argument('--markers')
         if name in ('append', 'next', 'wait', 'wake'):
             command.add_argument('--as', dest='person', required=True)
+        if name == 'next':
+            command.add_argument('--ack-wake', metavar='KEY',
+                                 help='acknowledge only the token in the queued notification being handled')
         if name == 'append':
             command.add_argument('--subject', required=True)
             command.add_argument('--body', required=True)
@@ -639,6 +674,8 @@ def arguments(argv):
             command.add_argument('--timeout', type=float, required=True)
             command.add_argument('--interval', type=float, default=1.0)
     args = parser.parse_args(argv)
+    if args.command == 'next' and args.ack_wake is not None and not KEY.fullmatch(args.ack_wake):
+        raise DuoError('--ack-wake must be a notification turn key')
     if args.command == 'tail' and args.turns < 0:
         raise DuoError('--turns must be nonnegative')
     if args.command == 'wait' and (not math.isfinite(args.timeout) or args.timeout < 0

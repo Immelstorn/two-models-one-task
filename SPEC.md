@@ -71,7 +71,7 @@ All commands take `--file PATH`, optional `--settings PATH`, and `--json` for on
 | `init --names A,B [--markers X,Y]` | Create a new `markdown` dialogue with a short rules preamble and the embedded settings block. Default markers `A_DONE_WAITING_FOR_B`, upper case. Refuses an existing path. A missing folder is created with a `.gitignore` containing `*`, so git ignores it. |
 | `status` | Read-only summary. |
 | `tail --turns K` | Read-only; the last K turns with text. |
-| `next --as NAME` | Deliver every unresolved completed peer turn, in file order, record a receipt for each and acknowledge NAME's outstanding wake. |
+| `next --as NAME [--ack-wake KEY]` | Deliver every unresolved completed peer turn and record a receipt for each. Only an explicit matching notification key acknowledges the outstanding wake. |
 | `wait --as NAME --timeout SEC [--interval SEC]` | Read-only; return when an unresolved completed peer turn exists that NAME has no receipt for. Redeliveries do not end a wait. An incomplete or malformed tail seen while waiting (a write in progress) does not end it either; check again at the next interval. |
 | `append --as NAME --subject TEXT --body FILE [--reply-to KEY ...] [--no-wake]` | Append one complete turn, then wake the peer (section 4, Wake). `--reply-to` repeats; `--reply-to all` names every unresolved peer turn the writer has received. |
 | `wake --as NAME --exec COMMAND` or `wake --as NAME --clear` | Register or remove NAME's wake command. Returns the resulting `wake` mapping. |
@@ -122,9 +122,11 @@ are `null` when there is no such turn.
 - Each recipient has at most one outstanding notification attempt. After committing a turn, `append`
   reserves that recipient's `wake_pending` slot with the new turn's key, under the same lock, and saves
   the state before dispatch. Further posts are committed normally but skip dispatch until the recipient
-  runs `next`. That command saves all receipts and clears its slot atomically before returning the
-  whole batch. It acknowledges receipt, not completion of the work; no reply is required. `status`,
-  `tail`, `wait` and the sender's `next` do not acknowledge the recipient's notification.
+  processes that queued notification and runs its `next --ack-wake KEY` command. A matching key clears
+  the slot atomically with receipt updates, even if all dialogue turns have already been answered.
+  An old, duplicated or unknown well-formed key does not clear a different outstanding notification;
+  malformed keys are usage errors. Ordinary `next`, replies, `status`, `tail` and `wait` never acknowledge
+  notifications. Reading a dialogue during a busy native task does not consume its queued input.
 - After reserving a notification and releasing the lock, the writer runs the peer's command once with
   `/bin/sh -c` and these environment variables: `DUO_FILE` (absolute path), `DUO_FROM` (the writer) and
   `DUO_TURN` (the new number). The working directory is the dialogue's directory. Other environment
@@ -132,6 +134,12 @@ are `null` when there is no such turn.
   cannot cancel an already selected command. The writer never runs its own command; `--no-wake` skips
   dispatch without reserving or releasing a slot. Dispatch completion never rewrites the slot, so an
   early receiver ACK or a newer reservation cannot be overwritten by a slow command finishing.
+- Dispatch also supplies `DUO_WAKE_TOKEN` (the reserved turn key) and `DUO_WAKE_ACK` (the exact shell
+  command to receive and acknowledge it, with absolute helper/dialogue paths and `--settings` when
+  needed). Direct `codex queue --thread ID --message TEXT` registrations automatically get this ACK
+  command added to the queued text, including registrations saved before this version. Other custom
+  commands must deliver `DUO_WAKE_ACK` to the recipient themselves. The token is for queue correlation,
+  not authentication or permission. The recipient uses it only while handling that queued notification.
 - The command has no stdin; its stdout and stderr are discarded so append output remains one JSON
   object. Commands can redirect their own diagnostics to a file. It has a 30-second timeout; timeout
   kills the shell's process group and reports exit 124. A launch failure reports exit 127; otherwise
@@ -146,11 +154,15 @@ are `null` when there is no such turn.
   exit 5: inspect the committed turn; never repeat an append to retry a notification.
 - This is one notification attempt until acknowledged, not guaranteed delivery. A crash between
   reservation and dispatch can miss it, and a failed or timed-out command may already have notified the
-  peer. Failure therefore leaves the slot reserved too. To recover, have the recipient run `next`, or
-  explicitly clear and re-register its wake command before a later post. Changing a registered command
-  also resets that recipient's slot; registering or auto-refreshing the same command preserves it.
+  peer. Failure therefore leaves the slot reserved too. To recover a confirmed lost notification,
+  explicitly clear and re-register its wake command before a later post. This is a recovery action,
+  never a way to bypass coalescing while a notification remains queued. Changing a manually registered
+  command also resets that recipient's slot; registering or auto-refreshing the same command preserves
+  it. Automatic refresh to the same Codex thread preserves it even if the message wording changes.
   Clearing a registration clears its slot. No automatic retry, expiry or background process.
   Existing notifications in an external queue are not cancelled or deduplicated retroactively.
+  Notifications queued before token support have no token: they cannot acknowledge a newer ping.
+  If an old reservation remains after that legacy queue is drained, clear/re-register once to recover.
   Receipt and reply tracking remain the source of truth.
 - The command runs with the writer's permissions; register only commands both sides trust.
 - Inside a Codex session, where `CODEX_THREAD_ID` holds a thread id, `next` and `append` register or

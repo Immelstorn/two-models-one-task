@@ -1,4 +1,4 @@
-"""One durable wake attempt per recipient until next acknowledges the batch."""
+"""One durable wake until its queued input is acknowledged, independent of reads."""
 from __future__ import annotations
 
 import importlib.util
@@ -54,10 +54,12 @@ sys.exit(int(sys.argv[2]))
 
         received = self.duo_json('next', *self.common, '--as', 'Bo')['turns']
         self.assertEqual([t['number'] for t in received], list(range(1, 11)))
+        self.assertEqual(self.status()['wake_pending'], {'Bo': first['turn']['key']})
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key'], expect=0)
         self.assertEqual(self.status()['wake_pending'], {})
         self.assertEqual(self.post_note('after ACK')['wake'], {'exit': 0})
         self.assertEqual(self.pings(), ['1', '11'])
-        # A receipt, not a completed reply, releases the next notification.
+        # Explicit notification ACK releases it; a completed reply is not required.
         self.assertEqual(len(self.status()['pending']['Bo']), 11)
 
     def test_no_wake_notes_neither_claim_nor_release_the_slot(self):
@@ -92,10 +94,11 @@ sys.exit(int(sys.argv[2]))
     def test_uncertain_failure_does_not_queue_again_until_ack(self):
         self.register(shlex.join([sys.executable, str(self.recorder), str(self.log), '1']))
         # The external command may queue successfully and then exit nonzero.
-        self.assertEqual(self.post_note()['wake'], {'exit': 1})
+        first = self.post_note()
+        self.assertEqual(first['wake'], {'exit': 1})
         self.assertEqual(self.post_note('later')['wake'], {'skipped': 'pending_ack'})
         self.assertEqual(self.pings(), ['1'])
-        self.duo('next', *self.common, '--as', 'Bo', expect=0)
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key'], expect=0)
         self.assertEqual(self.post_note('after ACK')['wake'], {'exit': 1})
         self.assertEqual(self.pings(), ['1', '3'])
 
@@ -116,7 +119,7 @@ sys.exit(int(sys.argv[2]))
     def test_failed_ack_save_keeps_the_slot_reserved(self):
         first = self.post_note()
         before = self.state_path.read_bytes()
-        args = duo.arguments(['next', *self.common, '--as', 'Bo'])
+        args = duo.arguments(['next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key']])
         with patch.object(duo, 'save_state', side_effect=OSError('disk full')):
             with self.assertRaises(duo.DuoError) as caught:
                 duo.deliver(args, self.path)
@@ -162,8 +165,10 @@ with log.open("a") as f:
             while not started.exists() and time.monotonic() < deadline:
                 time.sleep(.01)
             self.assertTrue(started.exists())
+            first_key = self.status()['wake_pending']['Bo']
             self.assertEqual(self.post_note('parallel')['wake'], {'skipped': 'pending_ack'})
-            self.assertEqual(len(self.duo_json('next', *self.common, '--as', 'Bo')['turns']), 2)
+            self.assertEqual(len(self.duo_json('next', *self.common, '--as', 'Bo',
+                                              '--ack-wake', first_key)['turns']), 2)
             third = self.post_note('new batch')
             self.assertEqual(third['wake'], {'exit': 0})
             release.touch()
@@ -190,3 +195,82 @@ with log.open("a") as f:
             self.assertEqual(json.loads(result.stdout)['wake'], {'skipped': 'pending_ack'})
             self.assertEqual(self.status()['wake_pending'], {'Bo': first['turn']['key']})
         self.assertEqual(self.pings(), ['1'])
+
+    def test_busy_reader_can_read_and_reply_repeatedly_without_rearming_queue(self):
+        first = self.post_note('start')
+        for i in range(8):
+            self.duo('next', *self.common, '--as', 'Bo', expect=0)
+            self.post(self.common, 'Bo', f'working {i}', 'Still working.\n', reply_to=('all',))
+            self.duo('next', *self.common, '--as', 'Ada', expect=0)
+            self.assertEqual(self.post_note(f'progress {i}')['wake'], {'skipped': 'pending_ack'})
+        self.assertEqual(self.pings(), ['1'])
+        self.assertEqual(self.status()['wake_pending'], {'Bo': first['turn']['key']})
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key'], expect=0)
+        self.assertEqual(self.post_note('after consuming queue')['wake'], {'exit': 0})
+        self.assertEqual(len(self.pings()), 2)
+
+    def test_old_or_duplicate_ack_cannot_release_a_newer_ping(self):
+        first = self.post_note('first')
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key'], expect=0)
+        second = self.post_note('second')
+        for token in (first['turn']['key'], '0' * 64):
+            self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', token, expect=0)
+            self.assertEqual(self.status()['wake_pending'], {'Bo': second['turn']['key']})
+        self.assertEqual(self.post_note('still reserved')['wake'], {'skipped': 'pending_ack'})
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', second['turn']['key'], expect=0)
+        self.assertEqual(self.status()['wake_pending'], {})
+        self.assertEqual(self.pings(), ['1', '2'])
+
+    def test_notification_ack_can_arrive_after_all_dialogue_work_is_answered(self):
+        first = self.post_note()
+        self.duo('next', *self.common, '--as', 'Bo', expect=0)
+        self.post(self.common, 'Bo', 'done', 'Done.\n', reply_to=('all',))
+        self.duo('next', *self.common, '--as', 'Bo', expect=2)
+        self.assertEqual(self.status()['wake_pending'], {'Bo': first['turn']['key']})
+        self.duo('next', *self.common, '--as', 'Bo', '--ack-wake', first['turn']['key'], expect=2)
+        self.assertEqual(self.status()['wake_pending'], {})
+
+    def test_direct_codex_queue_gets_exact_ack_command_including_legacy_settings(self):
+        # Fake binary records argv; there is no connection to a real Codex task.
+        executable = self.dir / 'codex'
+        queued = self.dir / 'queue.json'
+        executable.write_text('#!' + sys.executable + '\nimport json,sys\n'
+                              'from pathlib import Path\nPath(__file__).with_name("queue.json")'
+                              '.write_text(json.dumps(sys.argv[1:]))\n')
+        executable.chmod(0o755)
+        self.register(shlex.join([str(executable), 'queue', '--thread',
+                                  '11111111-1111-1111-1111-111111111111',
+                                  '--message', 'duo: Ada posted a turn. Not an owner message.']))
+        # Explicit settings must survive in the generated ACK invocation.
+        settings = duo.snapshot(self.path, None)[1]
+        settings_path = self.settings(settings)
+        first = self.post_note('legacy', '--settings', str(settings_path))
+        argv = json.loads(queued.read_text())
+        ack = shlex.split(argv[4].splitlines()[1])
+        self.assertEqual(argv[:4], ['queue', '--thread',
+                                    '11111111-1111-1111-1111-111111111111', '--message'])
+        self.assertIn('THIS queued notification', argv[4])
+        self.assertEqual(ack[ack.index('--ack-wake') + 1], first['turn']['key'])
+        self.assertEqual(ack[ack.index('--settings') + 1], str(settings_path.resolve()))
+        # Auto-refresh changes the message text but keeps the same destination.
+        # Even this first ordinary read must not clear the existing queue slot.
+        self.duo('next', *self.common, '--as', 'Bo', expect=0,
+                 env={'CODEX_THREAD_ID': '11111111-1111-1111-1111-111111111111',
+                      'PATH': str(self.dir) + ':/usr/bin:/bin'})
+        self.assertEqual(self.status()['wake_pending'], {'Bo': first['turn']['key']})
+        self.assertEqual(self.post_note('busy progress')['wake'], {'skipped': 'pending_ack'})
+        # Invoke precisely what the eventual queued message tells the recipient to run.
+        result = subprocess.run(ack, text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.status()['wake_pending'], {})
+
+    def test_custom_wake_can_deliver_the_ack_via_environment(self):
+        saved = self.dir / 'ack.txt'
+        script = self.write('save_ack.py', 'import os,pathlib,sys\n'
+                            'pathlib.Path(sys.argv[1]).write_text(os.environ["DUO_WAKE_ACK"])\n')
+        self.register(shlex.join([sys.executable, str(script), str(saved)]))
+        first = self.post_note()
+        ack = shlex.split(saved.read_text())
+        self.assertEqual(ack[ack.index('--ack-wake') + 1], first['turn']['key'])
+        self.assertEqual(subprocess.run(ack, capture_output=True, timeout=10).returncode, 0)
+        self.assertEqual(self.status()['wake_pending'], {})

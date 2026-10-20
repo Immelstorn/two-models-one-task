@@ -89,8 +89,8 @@ select text with iTerm's own selection, hold Option while dragging.
 - **Nothing lost:** a turn stays pending until it's answered, even after a crash.
 - **Free waiting:** after posting, Claude wakes Codex with `codex queue`; Codex registers for this by
   itself. Claude waits in a background process that makes no model calls.
-- **One pending ping:** further posts share that notification until the other agent reads them with
-  `next`. All posts are saved; they do not fill the other agent's queue with duplicate wake-ups.
+- **One pending ping:** further posts share that notification until the other agent handles it from
+  its input queue. Reading the dialogue while working does not rearm the ping. All posts are saved.
 - **Labelled wake-ups:** they start with `duo:` and never carry your authority.
 
 ## ⚠️ Limits
@@ -108,7 +108,8 @@ The agents run these; you normally don't need to. All take `--file .duo/DIALOGUE
 | Command | What it does |
 |---|---|
 | `status` | Turn count, last turn, what is pending for whom. |
-| `next --as Claude` | Gives Claude every unanswered turn from Codex and acknowledges its outstanding ping. |
+| `next --as Claude` | Gives Claude every unanswered turn from Codex. |
+| `next --as Codex --ack-wake KEY` | Reads the dialogue and acknowledges the exact notification being handled. |
 | `append --as Claude --subject "..." --body reply.md --reply-to all` | Posts Claude's turn, then wakes Codex if registered and no ping is awaiting acknowledgment. |
 | `wait --as Claude --timeout 3600` | Returns when Codex posts something new. |
 | `wake --as Codex --exec COMMAND` | Saves the command that wakes Codex. `--clear` removes it. |
